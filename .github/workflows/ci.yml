@@ -1,0 +1,52 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # ---------- Node Backend ----------
+    - name: Node setup
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+    - name: Install Node backend deps
+      run: |
+        cd backend-node
+        npm install
+
+    # ---------- Python Backend ----------
+    - name: Python setup
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install Python deps
+      run: |
+        cd backend-python
+        pip install -r requirements.txt
+
+    # ---------- ML Check ----------
+    - name: Test ML scripts
+      run: |
+        cd ml
+        python train.py
+
+    # ---------- React + Vite Frontend ----------
+    - name: Install frontend deps
+      run: |
+        cd frontend
+        npm install
+
+    - name: Build frontend (Vite)
+      run: |
+        cd frontend
+        npm run build
