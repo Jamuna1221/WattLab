@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Zap, Mail, Lock } from 'lucide-react';
 import loginBg from '../assets/wattlabloginpage.png';
+  import { supabase } from '../supabaseClient'; 
 
 export default function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -9,24 +10,43 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+// add this at top of file
 
-    // Demo mode - check if admin or user
-    setTimeout(() => {
-      setLoading(false);
-      
-      // Check if admin login (email contains 'admin')
-      if (formData.email.toLowerCase().includes('admin')) {
-        localStorage.setItem('userRole', 'admin');
-        navigate('/admin');
-      } else {
-        localStorage.setItem('userRole', 'user');
-        navigate('/dashboard');
-      }
-    }, 500);
-  };
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
+
+  // 🔐 Login using Supabase Auth
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: formData.email.trim(),
+    password: formData.password.trim(),
+  });
+
+  if (error) {
+    setError("Invalid email or password");
+    setLoading(false);
+    return;
+  }
+
+  // 🔎 Get user from users table
+  const { data: userData, error: userError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', data.user.id)
+    .single();
+
+  setLoading(false);
+
+  if (userError || !userData) {
+    setError("User profile not found");
+    return;
+  }
+
+  // 🚀 Since no role column → redirect all to dashboard
+  navigate('/dashboard');
+};
+
 
   return (
     <div 
