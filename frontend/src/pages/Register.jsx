@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import loginBg from "../assets/wattlabloginpage.png";
-import { supabase } from "../supabaseClient";
+
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -13,39 +13,34 @@ export default function Register() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError("");
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    const { data, error } = await supabase.auth.signUp({
-      email: formData.email.trim(),
-      password: formData.password.trim(),
-      options: {
-        data: {
-          name: formData.name,
-        },
+  try {
+    const res = await fetch("http://localhost:5000/api/auth/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify(formData),
     });
 
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-      return;
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message);
     }
 
-    if (!data.user) {
-      setError("User creation failed");
-      setLoading(false);
-      return;
-    }
-
-    setLoading(false);
-    alert("Registration successful! Please login.");
+    alert("Registration successful!");
     navigate("/login");
-  };
-
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <div
       className="min-h-screen w-full flex items-center justify-center p-4"

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Zap, Mail, Lock } from 'lucide-react';
 import loginBg from '../assets/wattlabloginpage.png';
-  import { supabase } from '../supabaseClient'; 
+
 
 export default function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -15,36 +15,32 @@ export default function Login() {
 const handleSubmit = async (e) => {
   e.preventDefault();
   setLoading(true);
-  setError('');
+  setError("");
 
-  // 🔐 Login using Supabase Auth
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: formData.email.trim(),
-    password: formData.password.trim(),
-  });
+  try {
+    const res = await fetch("http://localhost:5000/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(formData),
+    });
 
-  if (error) {
-    setError("Invalid email or password");
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message);
+    }
+
+    // Store token
+    localStorage.setItem("token", data.session.access_token);
+
+    navigate("/dashboard");
+  } catch (err) {
+    setError(err.message);
+  } finally {
     setLoading(false);
-    return;
   }
-
-  // 🔎 Get user from users table
-  const { data: userData, error: userError } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', data.user.id)
-    .single();
-
-  setLoading(false);
-
-  if (userError || !userData) {
-    setError("User profile not found");
-    return;
-  }
-
-  // 🚀 Since no role column → redirect all to dashboard
-  navigate('/dashboard');
 };
 
 
