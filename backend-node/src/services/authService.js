@@ -1,6 +1,13 @@
 const { supabase, supabaseAnon } = require('../config/supabaseClient');
 
-exports.registerUser = async ({ email, password, name }) => {
+exports.registerUser = async ({ email, password, name, username }) => {
+  
+  // Step 1: Check if email already exists in auth.users
+  const { data: existingAuthUsers } = await supabase.auth.admin.listUsers();
+  const alreadyExists = existingAuthUsers?.users?.find(u => u.email === email);
+  if (alreadyExists) throw new Error('Email already registered');
+
+  // Step 2: Create user in Supabase Auth
   const { data, error } = await supabase.auth.admin.createUser({
     email,
     password,
@@ -9,9 +16,14 @@ exports.registerUser = async ({ email, password, name }) => {
 
   if (error) throw new Error(error.message);
 
+  // Step 3: Use UPSERT instead of INSERT to avoid duplicate key error
   const { error: profileError } = await supabase
     .from('users')
-    .insert([{ id: data.user.id, email, name }]);
+    .upsert([{ 
+      id: data.user.id, 
+      email, 
+      name: name || username,
+    }], { onConflict: 'id' });  // ← KEY FIX
 
   if (profileError) throw new Error(profileError.message);
 
