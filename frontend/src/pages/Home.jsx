@@ -19,31 +19,38 @@ export default function Home() {
       title: 'Smart Analytics',
       description: 'Get detailed insights with appliance-wise breakdown and consumption patterns.',
       color: 'blue'
-    },
+    }, 
+
     {
       icon: TrendingDown,
       title: 'Bill Predictions',
       description: 'ML-powered monthly bill predictions to help you plan and budget better.',
       color: 'purple'
     },
+
     {
       icon: Lightbulb,
       title: 'Save Energy',
       description: 'Receive personalized recommendations to reduce consumption and save money.',
       color: 'orange'
     },
+
+
     {
       icon: Bell,
       title: 'Smart Alerts',
       description: 'Get notified about abnormal usage patterns and high consumption instantly.',
       color: 'red'
     },
+
+
     {
       icon: Shield,
       title: 'Secure & Private',
       description: 'Your data is encrypted and protected with enterprise-grade security.',
       color: 'indigo'
     }
+    
   ];
 
   const stats = [
