@@ -1,0 +1,6 @@
+{
+  "idle": 0,
+  "bulb_only": 1,
+  "other_only": 2,
+  "bulb_plus_other": 3
+}

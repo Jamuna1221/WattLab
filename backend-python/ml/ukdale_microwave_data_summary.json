@@ -1,0 +1,20 @@
+{
+  "appliance": "microwave",
+  "aggregate_rows_raw": 21837636,
+  "appliance_rows_raw": 19406625,
+  "rows_after_merge": 22374346,
+  "aggregate_negative_values_clipped": 0,
+  "appliance_negative_values_clipped": 0,
+  "aggregate_missing_before_fill": 1654202,
+  "appliance_missing_before_fill": 3616394,
+  "resample_seconds": 6,
+  "fill_limit": 30,
+  "agg_max": 8788.0,
+  "microwave_max": 3267.0,
+  "processed_file": "D:\\smartShakthi\\backend-python\\ml\\processed_microwave.csv",
+  "features_file": "D:\\smartShakthi\\backend-python\\ml\\features_microwave.csv",
+  "normalisation_file": "D:\\smartShakthi\\backend-python\\ml\\normalisation_params_microwave.json",
+  "global_normalisation_file": "D:\\smartShakthi\\backend-python\\ml\\normalisation_params.json",
+  "feature_rows_after_dropna": 22373747,
+  "data_source": "UK-DALE"
+}

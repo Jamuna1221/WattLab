@@ -1,0 +1,38 @@
+{
+  "accuracy": 0.7714,
+  "precision_macro": 0.6906,
+  "recall_macro": 0.7483,
+  "f1_macro": 0.7119,
+  "confusion_matrix": [
+    [
+      33,
+      19,
+      0,
+      0
+    ],
+    [
+      19,
+      167,
+      20,
+      2
+    ],
+    [
+      0,
+      0,
+      26,
+      19
+    ],
+    [
+      0,
+      0,
+      1,
+      44
+    ]
+  ],
+  "labels": [
+    "idle",
+    "bulb_only",
+    "other_only",
+    "bulb_plus_other"
+  ]
+}

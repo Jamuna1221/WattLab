@@ -1,0 +1,7 @@
+{
+  "appliance": "kettle",
+  "MAE_watts": 28.62,
+  "RMSE_watts": 163.51,
+  "F1_score": 0.017,
+  "R2_score": -0.0056
+}

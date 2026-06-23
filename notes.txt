@@ -1,0 +1,11 @@
+{"success":true,
+"device":{"id":1,"device_id":"SIM-DEVICE-001",
+"device_secret":"$2b$10$.IG8fJbrOdE3fTECYBwpiuT/Pqmhmvtx6PB6zHWuhUZW26N6kRdXG",
+"user_id":null,"status":"UNASSIGNED","registered_at":"2026-04-10T17:35:22.706002+00:00"}}
+
+{"success":true,"message":"Device linked successfully",
+"device":{"id":1,"device_id":"SIM-DEVICE-001",
+"device_secret":"$2b$10$.IG8fJbrOdE3fTECYBwpiuT/Pqmhmvtx6PB6zHWuhUZW26N6kRdXG",
+"user_id":"36511d40-302f-4875-aba9-58c3bca50a6a","status":"ASSIGNED",
+"registered_at":"2026-04-10T17:35:22.706002+00:00"},
+"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkZXZpY2VJZCI6IlNJTS1ERVZJQ0UtMDAxIiwidXNlcklkIjoiMzY1MTFkNDAtMzAyZi00ODc1LWFiYTktNThjM2JjYTUwYTZhIiwiaWF0IjoxNzc1ODQ3NzQxLCJleHAiOjE3Nzg0Mzk3NDF9.JePSNcB-7eeGOHlVfuV6YuN1xk-SN-I9654MrmMf7Ts"}

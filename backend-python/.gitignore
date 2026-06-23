@@ -1,0 +1,17 @@
+# Ignore virtual environment
+venv/
+
+# Ignore ML experiment folder
+ml/house_1/
+
+
+
+# Environment variables
+.env
+
+# Model files (optional but recommended)
+*.h5
+*.pkl
+
+# Logs
+*.log

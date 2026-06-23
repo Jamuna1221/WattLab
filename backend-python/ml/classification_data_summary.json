@@ -1,0 +1,18 @@
+{
+  "rows": 2449,
+  "labels": {
+    "idle": 0,
+    "bulb_only": 1,
+    "other_only": 2,
+    "bulb_plus_other": 3
+  },
+  "counts": {
+    "bulb_only": 1415,
+    "bulb_plus_other": 332,
+    "idle": 373,
+    "other_only": 329
+  },
+  "min_power": 0.0,
+  "max_power": 3.5,
+  "avg_power": 0.4437
+}

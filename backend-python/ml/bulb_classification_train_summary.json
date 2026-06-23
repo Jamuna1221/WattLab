@@ -1,0 +1,6 @@
+{
+  "train_accuracy_last_epoch": 0.5681,
+  "val_accuracy_last_epoch": 0.5158,
+  "train_loss_last_epoch": 0.647,
+  "val_loss_last_epoch": 0.7257
+}

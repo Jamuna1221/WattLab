@@ -1,0 +1,29 @@
+# Node / Vite
+node_modules/
+dist/
+
+# Python
+venv/
+__pycache__/
+backend-python/ml/__pycache__/
+
+# Environment variables
+.env
+
+# Large ML data files - never commit these
+backend-python/ml/*.npy
+backend-python/ml/*.csv
+backend-python/ml/house_1/
+
+# Trained model binaries - share via Google Drive
+backend-python/ml/*.h5
+backend-python/ml/*.keras
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
