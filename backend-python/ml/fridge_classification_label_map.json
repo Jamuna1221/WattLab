@@ -1,0 +1,6 @@
+{
+  "idle": 0,
+  "fridge_only": 1,
+  "other_only": 2,
+  "fridge_plus_other": 3
+}

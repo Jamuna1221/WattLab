@@ -1,0 +1,6 @@
+{
+  "idle": 0,
+  "dishwasher_only": 1,
+  "other_only": 2,
+  "dishwasher_plus_other": 3
+}

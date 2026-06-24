@@ -1,0 +1,6 @@
+{
+  "idle": 0,
+  "microwave_only": 1,
+  "other_only": 2,
+  "microwave_plus_other": 3
+}

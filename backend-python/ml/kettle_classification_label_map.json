@@ -1,0 +1,6 @@
+{
+  "idle": 0,
+  "kettle_only": 1,
+  "other_only": 2,
+  "kettle_plus_other": 3
+}

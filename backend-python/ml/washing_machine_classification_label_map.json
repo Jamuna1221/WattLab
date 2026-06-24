@@ -1,0 +1,6 @@
+{
+  "idle": 0,
+  "washing_machine_only": 1,
+  "other_only": 2,
+  "washing_machine_plus_other": 3
+}
