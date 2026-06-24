@@ -1,0 +1,18 @@
+{
+  "rows": 150518,
+  "labels": {
+    "idle": 0,
+    "microwave_only": 1,
+    "other_only": 2,
+    "microwave_plus_other": 3
+  },
+  "counts": {
+    "idle": 50000,
+    "microwave_only": 518,
+    "microwave_plus_other": 50000,
+    "other_only": 50000
+  },
+  "min_power": 103.0,
+  "max_power": 8788.0,
+  "avg_power": 913.6757
+}

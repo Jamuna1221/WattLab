@@ -120,6 +120,34 @@ async function fetchRecentDevicePowerReadings(device_id, limit = BULB_ACTIVITY_W
   };
 }
 
+async function callTrayEndpoint(timestamp, powerWatts) {
+  const response = await fetch(`${FLASK_URL}/predict/tray`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ timestamp, power_watts: powerWatts }),
+  });
+  const result = await safeJson(response);
+  if (!response.ok) throw new Error(result?.error || 'Flask tray prediction failed');
+  return result;
+}
+exports.callTrayEndpoint = callTrayEndpoint;
+
+async function getTrayState() {
+  const response = await fetch(`${FLASK_URL}/tray/state`);
+  const result = await safeJson(response);
+  if (!response.ok) throw new Error(result?.error || 'Flask tray state failed');
+  return result;
+}
+exports.getTrayState = getTrayState;
+
+async function resetTrayState() {
+  const response = await fetch(`${FLASK_URL}/tray/reset`, { method: 'POST' });
+  const result = await safeJson(response);
+  if (!response.ok) throw new Error(result?.error || 'Flask tray reset failed');
+  return result;
+}
+exports.resetTrayState = resetTrayState;
+
 function getAgeSeconds(timestamp) {
   if (!timestamp) return Number.POSITIVE_INFINITY;
   const parsed = new Date(timestamp).getTime();
@@ -237,6 +265,64 @@ exports.predictBulbActivityFromHistory = async (device_id) => {
   latestBulbActivityByDevice[device_id] = payload;
   return payload;
 };
+
+async function predictApplianceActivity(device_id, appliance) {
+  const prefix = String(appliance || '').trim().toLowerCase();
+  if (!prefix) throw new Error('appliance is required');
+
+  const { readings, user_id, last_timestamp } = await fetchRecentDevicePowerReadings(device_id, 50);
+  const latestAgeSeconds = getAgeSeconds(last_timestamp);
+
+  if (latestAgeSeconds > BULB_ACTIVITY_MAX_AGE_SECONDS) {
+    return {
+      status: 'skipped',
+      reason: `Latest live sample is ${Math.round(latestAgeSeconds)}s old. Start ESP32 streaming for a fresh prediction.`,
+      device_id,
+      appliance: prefix,
+      sample_count: readings.length,
+      max_age_seconds: BULB_ACTIVITY_MAX_AGE_SECONDS,
+      last_timestamp,
+    };
+  }
+
+  const response = await fetch(`${FLASK_URL}/predict/activity/${prefix}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ readings }),
+  });
+
+  const result = await safeJson(response);
+  if (!response.ok) {
+    return {
+      status: 'skipped',
+      reason: result?.error || `${prefix} activity classifier unavailable`,
+      device_id,
+      appliance: prefix,
+      sample_count: readings.length,
+      last_timestamp,
+    };
+  }
+
+  const probabilities = result.class_probabilities || result.probabilities || {};
+  return {
+    status: 'predicted',
+    device_id,
+    appliance: prefix,
+    user_id,
+    timestamp: last_timestamp || new Date().toISOString(),
+    sample_count: readings.length,
+    activity_label: result.activity_label,
+    model_activity_label: result.model_activity_label,
+    correction_applied: result.correction_applied,
+    confidence: result.confidence,
+    probabilities,
+    avg_power_watts: result.avg_power_watts,
+    max_power_watts: result.max_power_watts,
+    window_size: result.window_size,
+    source: 'recent-device-history',
+  };
+}
+exports.predictApplianceActivity = predictApplianceActivity;
 
 async function ensureBulbModelTrainedIfNeeded(readings) {
   const healthResponse = await fetch(`${FLASK_URL}/health`);

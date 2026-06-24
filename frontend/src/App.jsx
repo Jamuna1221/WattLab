@@ -7,6 +7,12 @@ import Register from "./pages/Register";
 import UserDashboard from "./pages/UserDashboard";
 import LiveDashboard from "./pages/LiveDashboard";
 import PredictionsPage from "./pages/PredictionsPage";
+import AppliancesPage from "./pages/AppliancesPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
+import HistoryPage from "./pages/HistoryPage";
+import BillPage from "./pages/BillPage";
+import AlertsPage from "./pages/AlertsPage";
+import SettingsPage from "./pages/SettingsPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminLogin from "./pages/AdminLogin";
 import AdminPrivateRoute from "./components/AdminPrivateRoute";
@@ -36,6 +42,12 @@ function App() {
         <Route path="/dashboard" element={<UserDashboard />} />
         <Route path="/dashboard/live" element={<LiveDashboard />} />
         <Route path="/dashboard/predictions" element={<PredictionsPage />} />
+        <Route path="/dashboard/appliances" element={<AppliancesPage />} />
+        <Route path="/dashboard/analytics" element={<AnalyticsPage />} />
+        <Route path="/dashboard/history" element={<HistoryPage />} />
+        <Route path="/dashboard/bill" element={<BillPage />} />
+        <Route path="/dashboard/alerts" element={<AlertsPage />} />
+        <Route path="/dashboard/settings" element={<SettingsPage />} />
 
         {/* Admin routes */}
         <Route path="/admin/login" element={<AdminLogin />} />

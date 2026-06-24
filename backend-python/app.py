@@ -1,4 +1,6 @@
 import os
+import glob
+from datetime import datetime
 
 # Must run before `import tensorflow` / keras: cuts Abseil + oneDNN INFO on stderr
 # (Windows CPU wheels). Override in the shell if you want oneDNN optimizations.
@@ -40,6 +42,7 @@ from ml.state_model_pipeline import (
     load_state_model,
     train_state_model,
 )
+from candidate_tray_engine import CandidateTrayEngine
 
 app = Flask(__name__)
 
@@ -56,24 +59,6 @@ norm_params = json.load(open(os.path.join(ML_FOLDER, 'normalisation_params.json'
 bill_config = json.load(open(os.path.join(ML_FOLDER, 'bill_config.json')))
 
 # Load appliance models — add more as you train them
-models = {}
-appliance_models = {
-    'bulb'            : 'bulb_model_final.h5',
-    'kettle'          : 'kettle_model_final.h5',
-    'washing_machine' : 'washing_machine_model_final.h5',
-    'fridge'          : 'fridge_model_final.h5',
-    'dishwasher'      : 'dishwasher_model_final.h5',
-    'microwave'       : 'microwave_model_final.h5',
-}
-
-for appliance, filename in appliance_models.items():
-    filepath = os.path.join(ML_FOLDER, filename)
-    if os.path.exists(filepath):
-        models[appliance] = keras.models.load_model(filepath)
-        print(f"  Loaded: {appliance}")
-    else:
-        print(f"  Skipped (not found): {filename}")
-
 # Load bill prediction model
 bill_model_path = os.path.join(ML_FOLDER, 'bill_prediction_model.h5')
 if os.path.exists(bill_model_path):
@@ -87,6 +72,7 @@ state_models = {}
 activity_models = {}
 activity_label_maps = {}
 activity_window_meta = {}
+tray_engine = CandidateTrayEngine(step_threshold_watts=100.0, noise_floor_watts=30.0)
 
 
 def get_state_model_path(appliance):
@@ -139,6 +125,24 @@ def load_activity_model_for(prefix):
 
 
 load_activity_model_for('bulb')
+for _appliance in ['fridge', 'kettle', 'microwave', 'washing_machine', 'dishwasher']:
+    load_activity_model_for(_appliance)
+
+for summary_file in glob.glob(os.path.join(ML_FOLDER, '*_classification_train_summary.json')):
+    with open(summary_file, encoding='utf-8') as f:
+        summary = json.load(f)
+    prefix = summary.get('appliance')
+    if prefix:
+        activity_window_meta[prefix] = {
+            'window_size': summary.get('window_size', 31),
+            'power_max': summary.get('power_max', 3.5),
+        }
+
+for lm_file in glob.glob(os.path.join(ML_FOLDER, '*_classification_label_map.json')):
+    prefix = os.path.basename(lm_file).replace('_classification_label_map.json', '')
+    with open(lm_file, encoding='utf-8') as f:
+        label_to_id = json.load(f)
+    activity_label_maps[prefix] = {int(v): k for k, v in label_to_id.items()}
 
 print("All available models loaded.\n")
 
@@ -149,7 +153,7 @@ print("All available models loaded.\n")
 def health():
     return jsonify({
         'status'         : 'running',
-        'models_loaded'  : list(models.keys()),
+        'regression_models': 'deprecated',
         'bill_model'     : bill_model is not None,
         'bulb_state_model': state_models.get('bulb') is not None,
         'state_models_loaded': sorted([name for name, model in state_models.items() if model is not None]),
@@ -165,6 +169,10 @@ def health():
 #   { "appliance": "kettle", "predicted_watts": 1245.6 }
 @app.route('/predict/appliance', methods=['POST'])
 def predict_appliance():
+    return jsonify({
+        'error': 'Regression models deprecated, use /predict/activity/<appliance>'
+    }), 410
+
     try:
         data      = request.get_json()
         appliance = data.get('appliance', 'kettle')
@@ -188,7 +196,9 @@ def predict_appliance():
         # Convert back to Watts using the appliance's max value
         # For now we use kettle_max for all — update when you train other models
         appliance_max_key = f'{appliance}_max'
-        appliance_max = norm_params.get(appliance_max_key, norm_params['kettle_max'])
+        if appliance_max_key not in norm_params:
+            return jsonify({'error': f'No normalisation params for {appliance}. Train the model first.'}), 503
+        appliance_max = norm_params[appliance_max_key]
         pred_watts  = float(pred_norm * appliance_max)
         pred_watts  = max(0.0, pred_watts)  # Clip to non-negative
 
@@ -386,6 +396,41 @@ def predict_bulb_activity():
 @app.route('/predict/activity/<prefix>', methods=['POST'])
 def predict_generic_activity(prefix):
     return predict_activity_for(prefix.lower())
+
+
+@app.route('/predict/tray', methods=['POST'])
+def predict_tray():
+    """
+    Node.js sends one reading at a time:
+      { "timestamp": "2026-06-23T10:00:00Z", "power_watts": 452.3 }
+    Returns current candidate tray state.
+    """
+    try:
+        data = request.get_json() or {}
+        timestamp_str = data.get('timestamp')
+        if not timestamp_str:
+            return jsonify({'error': 'timestamp is required'}), 400
+
+        power_watts = float(data.get('power_watts', 0))
+        timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        state = tray_engine.process_reading(timestamp, power_watts)
+        return jsonify(state)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/tray/state', methods=['GET'])
+def tray_state():
+    """Returns current tray state without processing a new reading."""
+    return jsonify(tray_engine.get_state())
+
+
+@app.route('/tray/reset', methods=['POST'])
+def tray_reset():
+    """Resets the tray engine (for testing)."""
+    global tray_engine
+    tray_engine = CandidateTrayEngine()
+    return jsonify({'status': 'reset'})
 
 # --------------------------------------------------------------------------
 # RUN THE SERVER

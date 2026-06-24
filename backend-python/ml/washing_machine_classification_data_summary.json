@@ -1,0 +1,18 @@
+{
+  "rows": 170596,
+  "labels": {
+    "idle": 0,
+    "washing_machine_only": 1,
+    "other_only": 2,
+    "washing_machine_plus_other": 3
+  },
+  "counts": {
+    "idle": 50000,
+    "other_only": 50000,
+    "washing_machine_only": 20596,
+    "washing_machine_plus_other": 50000
+  },
+  "min_power": 95.0,
+  "max_power": 8054.0,
+  "avg_power": 548.1697
+}

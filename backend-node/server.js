@@ -8,6 +8,7 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 const deviceRoutes      = require('./src/routes/deviceRoutes');
 const readingsRoutes    = require('./src/routes/readingsRoutes');
 const predictionsRoutes = require('./src/routes/predictionsRoutes');
+const trayRoutes        = require('./src/routes/trayRoutes');
 const predictionsService = require('./src/services/predictionsService');
 const authRoutes = require('./src/routes/authRoutes');
 const adminRoutes = require('./src/routes/adminRoutes');
@@ -30,6 +31,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/devices',     deviceRoutes);
 app.use('/api/readings',    readingsRoutes);
 app.use('/api/predictions', predictionsRoutes);
+app.use('/api/tray',        trayRoutes);
  
 // --------------------------------------------------------------------------
 // Health check
@@ -50,6 +52,8 @@ app.get('/health', (req, res) => {
       'GET  /api/readings/weekly/:deviceId',
       'GET  /api/predictions/:deviceId',
       'GET  /api/predictions/bill/:deviceId',
+      'GET  /api/tray/state',
+      'POST /api/tray/reset',
     ]
   });
 });

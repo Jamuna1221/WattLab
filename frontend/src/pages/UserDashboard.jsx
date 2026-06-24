@@ -3,9 +3,20 @@ import { useNavigate, Link } from 'react-router-dom';
 import { 
   Zap, Activity, TrendingUp, Bell, Plus, 
   LogOut, Settings, ChevronDown, AlertTriangle,
-  Lightbulb, DollarSign, BarChart3, LayoutDashboard, Home
+  Lightbulb, DollarSign, BarChart3, LayoutDashboard, Home,
+  History, IndianRupee
 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import api from '../utils/api';
+
+const MODEL_STATUS = [
+  { appliance: 'Bulb', status: 'Trained OK', accuracy: '77.0%' },
+  { appliance: 'Fridge', status: 'Trained OK', accuracy: '78.7%' },
+  { appliance: 'Kettle', status: 'Pending', accuracy: '-' },
+  { appliance: 'Microwave', status: 'Pending', accuracy: '-' },
+  { appliance: 'Washing Mach.', status: 'Pending', accuracy: '-' },
+  { appliance: 'Dishwasher', status: 'Pending', accuracy: '-' },
+];
 
 export default function UserDashboard() {
   const navigate = useNavigate();
@@ -75,7 +86,27 @@ export default function UserDashboard() {
       activeAlerts: mockAlerts.length
     });
 
-    setBillPrediction({ predicted_bill: 2847.50, confidence: 0.92 });
+    setBillPrediction({ predictedCost: 2847.50, savingsPotential: 210.00, confidence: 0.92 });
+
+    try {
+      const deviceId = localStorage.getItem('wattlab_device_id') || 'SIM-DEVICE-001';
+      const { data } = await api.get(`/predictions/bill/${encodeURIComponent(deviceId)}`);
+      const bill = data?.bill;
+      if (bill) {
+        const totalKwh = Number(bill.last_30_days_kwh || bill.monthly_estimate_kwh || 0);
+        setStats((current) => ({
+          ...current,
+          totalConsumption: totalKwh ? totalKwh.toFixed(2) : current.totalConsumption,
+        }));
+        setBillPrediction({
+          predictedCost: Number(bill.monthly_estimate_inr || bill.estimated_cost_inr * 30 || 0).toFixed(2),
+          savingsPotential: '210.00',
+          confidence: 0.92,
+        });
+      }
+    } catch {
+      // Keep mock overview data when the backend is offline.
+    }
     setLoading(false);
   };
 
@@ -101,13 +132,35 @@ export default function UserDashboard() {
     );
   }
 
-  const menuItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'appliances', label: 'Appliances', icon: Zap },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'recommendations', label: 'Tips', icon: Lightbulb },
-    { id: 'alerts', label: 'Alerts', icon: Bell },
+  const menuSections = [
+    {
+      title: 'Monitor',
+      items: [
+        { id: 'overview', label: 'Overview', icon: LayoutDashboard, to: '/dashboard' },
+        { id: 'live', label: 'Live Readings', icon: Activity, to: '/dashboard/live' },
+        { id: 'appliances', label: 'Appliances', icon: Zap, to: '/dashboard/appliances' },
+        { id: 'history', label: 'History', icon: History, to: '/dashboard/history' },
+      ],
+    },
+    {
+      title: 'Insights',
+      items: [
+        { id: 'analytics', label: 'Analytics', icon: BarChart3, to: '/dashboard/analytics' },
+        { id: 'bill', label: 'Bill Forecast', icon: IndianRupee, to: '/dashboard/bill' },
+        { id: 'alerts', label: 'Alerts', icon: Bell, to: '/dashboard/alerts' },
+        { id: 'settings', label: 'Settings', icon: Settings, to: '/dashboard/settings' },
+      ],
+    },
+    {
+      title: 'Phase 1 - Live data',
+      items: [
+        { id: 'predictions', label: 'ML & bill', icon: TrendingUp, to: '/dashboard/predictions' },
+      ],
+    },
   ];
+  const menuItems = menuSections
+    .flatMap((section) => section.items)
+    .filter((item) => !['live', 'predictions'].includes(item.id));
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-emerald-50 via-teal-50 to-green-50 flex">
@@ -151,11 +204,11 @@ export default function UserDashboard() {
             {menuItems.map((item) => {
               const Icon = item.icon;
               return (
-                <button
+                <Link
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
+                  to={item.to}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-                    activeTab === item.id
+                    item.id === 'overview'
                       ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30'
                       : 'text-emerald-700 hover:bg-emerald-50 hover:text-emerald-600'
                   }`}
@@ -167,7 +220,7 @@ export default function UserDashboard() {
                       {alerts.length}
                     </span>
                   )}
-                </button>
+                </Link>
               );
             })}
           </div>
@@ -319,6 +372,67 @@ export default function UserDashboard() {
               ) : (
                 <p className="text-emerald-600 text-center py-4">No active alerts</p>
               )}
+            </div>
+
+            <div className="bg-white/80 backdrop-blur-sm border border-emerald-100 rounded-xl p-6 hover:bg-white hover:shadow-lg transition-all">
+              <h3 className="text-lg font-semibold text-emerald-900 mb-4">Model Status</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[520px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-emerald-100 text-emerald-600">
+                      <th className="py-3 pr-4 font-semibold">Appliance</th>
+                      <th className="py-3 pr-4 font-semibold">Status</th>
+                      <th className="py-3 pr-4 font-semibold">Accuracy</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {MODEL_STATUS.map((row) => (
+                      <tr key={row.appliance} className="border-b border-emerald-50">
+                        <td className="py-3 pr-4 font-medium text-emerald-900">{row.appliance}</td>
+                        <td className="py-3 pr-4">
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              row.status.includes('Trained')
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-slate-50 text-slate-600 border border-slate-200'
+                            }`}
+                          >
+                            {row.status}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-4 text-emerald-700">{row.accuracy}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard/live')}
+                className="rounded-xl bg-emerald-600 px-5 py-4 text-left text-white shadow-sm hover:bg-emerald-700"
+              >
+                <p className="text-sm text-emerald-100">Quick action</p>
+                <p className="font-semibold">View Live Feed</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard/bill')}
+                className="rounded-xl bg-white border border-emerald-100 px-5 py-4 text-left text-emerald-900 shadow-sm hover:bg-emerald-50"
+              >
+                <p className="text-sm text-emerald-600">Quick action</p>
+                <p className="font-semibold">Check Bill Forecast</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard/history')}
+                className="rounded-xl bg-white border border-emerald-100 px-5 py-4 text-left text-emerald-900 shadow-sm hover:bg-emerald-50"
+              >
+                <p className="text-sm text-emerald-600">Quick action</p>
+                <p className="font-semibold">Export History</p>
+              </button>
             </div>
           </div>
         )}

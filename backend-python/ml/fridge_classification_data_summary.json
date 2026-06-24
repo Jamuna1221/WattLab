@@ -1,0 +1,18 @@
+{
+  "rows": 200000,
+  "labels": {
+    "idle": 0,
+    "fridge_only": 1,
+    "other_only": 2,
+    "fridge_plus_other": 3
+  },
+  "counts": {
+    "fridge_only": 50000,
+    "fridge_plus_other": 50000,
+    "idle": 50000,
+    "other_only": 50000
+  },
+  "min_power": 73.0,
+  "max_power": 6900.0,
+  "avg_power": 323.3532
+}

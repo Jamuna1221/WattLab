@@ -1,0 +1,18 @@
+{
+  "rows": 154317,
+  "labels": {
+    "idle": 0,
+    "dishwasher_only": 1,
+    "other_only": 2,
+    "dishwasher_plus_other": 3
+  },
+  "counts": {
+    "dishwasher_only": 4317,
+    "dishwasher_plus_other": 50000,
+    "idle": 50000,
+    "other_only": 50000
+  },
+  "min_power": 119.0,
+  "max_power": 7571.0,
+  "avg_power": 642.0323
+}

@@ -12,10 +12,20 @@ from tensorflow.keras import layers
 
 DEFAULT_WINDOW_SIZE = 31
 DEFAULT_RESAMPLE_SECONDS = 0
-SUPPORTED_LABELS = ["idle", "bulb_only", "other_only", "bulb_plus_other"]
 
 
-def load_classification_csv(path):
+def default_supported_labels():
+    return ["idle", "bulb_only", "other_only", "bulb_plus_other"]
+
+
+def normalize_supported_labels(supported_labels):
+    if supported_labels is None:
+        return default_supported_labels()
+    return [str(label).strip().lower() for label in supported_labels]
+
+
+def load_classification_csv(path, supported_labels=None):
+    supported_labels = normalize_supported_labels(supported_labels)
     print("=" * 60)
     print("STEP 1: Loading exported classification CSV...")
     print("=" * 60)
@@ -40,16 +50,21 @@ def load_classification_csv(path):
     if dropped:
         print(f"  Dropped rows with invalid timestamp/power/label: {dropped:,}")
 
-    df = df[df["appliance_label"].isin(SUPPORTED_LABELS)].copy()
+    df = df[df["appliance_label"].isin(supported_labels)].copy()
     if df.empty:
-        raise ValueError(f"No rows found for supported labels: {SUPPORTED_LABELS}")
+        raise ValueError(f"No rows found for supported labels: {supported_labels}")
 
     print("\n  Label counts before preprocessing:")
     print(df["appliance_label"].value_counts().sort_index().to_string())
     return df
 
 
-def preprocess_classification_dataframe(df, resample_seconds=DEFAULT_RESAMPLE_SECONDS):
+def preprocess_classification_dataframe(
+    df,
+    resample_seconds=DEFAULT_RESAMPLE_SECONDS,
+    supported_labels=None,
+):
+    supported_labels = normalize_supported_labels(supported_labels)
     print("\n" + "=" * 60)
     print("STEP 2: Cleaning and resampling labeled data...")
     print("=" * 60)
@@ -64,7 +79,7 @@ def preprocess_classification_dataframe(df, resample_seconds=DEFAULT_RESAMPLE_SE
         processed = df.sort_values("timestamp").reset_index(drop=True)
         print("  Resampling skipped; keeping exported rows as individual samples.")
         print("\n  Per-label summary:")
-        for label in SUPPORTED_LABELS:
+        for label in supported_labels:
             label_df = processed[processed["appliance_label"] == label]
             if label_df.empty:
                 continue
@@ -80,7 +95,7 @@ def preprocess_classification_dataframe(df, resample_seconds=DEFAULT_RESAMPLE_SE
     processed_parts = []
     label_summaries = []
 
-    for label in SUPPORTED_LABELS:
+    for label in supported_labels:
         label_df = df[df["appliance_label"] == label].copy()
         if label_df.empty:
             continue
@@ -123,7 +138,8 @@ def preprocess_classification_dataframe(df, resample_seconds=DEFAULT_RESAMPLE_SE
     return processed
 
 
-def save_classification_outputs(script_dir, processed_df, prefix="bulb"):
+def save_classification_outputs(script_dir, processed_df, prefix="bulb", supported_labels=None):
+    supported_labels = normalize_supported_labels(supported_labels)
     print("\n" + "=" * 60)
     print("STEP 3: Saving processed classification dataset...")
     print("=" * 60)
@@ -132,7 +148,7 @@ def save_classification_outputs(script_dir, processed_df, prefix="bulb"):
     label_map_path = os.path.join(script_dir, f"{prefix}_classification_label_map.json")
     summary_path = os.path.join(script_dir, f"{prefix}_classification_data_summary.json")
 
-    label_to_id = {label: idx for idx, label in enumerate(SUPPORTED_LABELS)}
+    label_to_id = {label: idx for idx, label in enumerate(supported_labels)}
     processed_df = processed_df.copy()
     processed_df["label_id"] = processed_df["appliance_label"].map(label_to_id)
     processed_df.to_csv(processed_path, index=False)
@@ -157,7 +173,8 @@ def save_classification_outputs(script_dir, processed_df, prefix="bulb"):
     return processed_path, label_map_path, summary_path
 
 
-def create_classification_windows(df, window_size=DEFAULT_WINDOW_SIZE):
+def create_classification_windows(df, window_size=DEFAULT_WINDOW_SIZE, supported_labels=None):
+    supported_labels = normalize_supported_labels(supported_labels)
     print("\n" + "=" * 60)
     print("STEP 4: Creating sliding windows for classification...")
     print("=" * 60)

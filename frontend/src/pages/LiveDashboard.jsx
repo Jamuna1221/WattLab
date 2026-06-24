@@ -96,6 +96,199 @@ function activityDisplay(activity) {
   };
 }
 
+function formatApplianceName(appliance) {
+  return String(appliance || '').replace(/_/g, ' ');
+}
+
+const CONFIRM_SECONDS = {
+  kettle: 30,
+  microwave: 20,
+  fridge: 300,
+  washing_machine: 900,
+  dishwasher: 1800,
+  other: 30,
+};
+
+function CandidateTray({ trayState, trayError }) {
+  const events = trayState?.active_events || [];
+  const hasEvents = events.length > 0;
+
+  return (
+    <div className="mt-6 border-t border-emerald-100 pt-5">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-600">
+          Candidate tray
+        </h3>
+        {trayState?.current_power_watts != null && (
+          <span className="text-xs text-emerald-500 tabular-nums">
+            {Math.round(Number(trayState.current_power_watts))} W now
+          </span>
+        )}
+      </div>
+
+      {trayError && (
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+          {trayError}
+        </p>
+      )}
+
+      {!hasEvents && !trayError && (
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-4 flex items-center gap-3">
+          <span className="relative flex h-3 w-3">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-600" />
+          </span>
+          <div>
+            <p className="font-semibold text-emerald-900">All quiet - monitoring for appliance activity</p>
+            <p className="text-xs text-emerald-600">A new power step will open candidates here.</p>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {events.map((event) => {
+          const candidates = event.candidates || [];
+          const elapsed = Number(event.elapsed_seconds || 0);
+          const targetSeconds = Math.max(
+            1,
+            ...candidates.map((candidate) => CONFIRM_SECONDS[candidate] || 30)
+          );
+          const progress = Math.min(100, (elapsed / targetSeconds) * 100);
+          const confirmedKwh =
+            trayState?.total_confirmed_kwh?.[event.confirmed_appliance] || 0;
+
+          return (
+            <div
+              key={event.event_id}
+              className={`rounded-xl border px-4 py-4 ${
+                event.status === 'confirmed'
+                  ? 'border-emerald-200 bg-emerald-50'
+                  : 'border-emerald-100 bg-white'
+              }`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white tabular-nums">
+                  {event.delta_watts >= 0 ? '+' : ''}
+                  {Number(event.delta_watts || 0).toFixed(0)} W detected
+                </span>
+                <div className="text-xs text-emerald-500 tabular-nums">
+                  {event.status === 'pending'
+                    ? `Analyzing for ${Math.round(elapsed)}s...`
+                    : `${Math.round(elapsed)}s window`}
+                </div>
+              </div>
+
+              {event.status === 'pending' && (
+                <>
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-emerald-600">Could be:</span>
+                    {candidates.map((candidate) => (
+                      <span
+                        key={candidate}
+                        className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-900 transition-all"
+                      >
+                        {formatApplianceName(candidate)}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-emerald-100">
+                    <div
+                      className="h-full rounded-full bg-emerald-600 transition-all duration-500"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </>
+              )}
+
+              {event.status === 'confirmed' && (
+                <div className="mt-4 flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-2xl font-bold text-white">
+                    OK
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-emerald-900">
+                      {formatApplianceName(event.confirmed_appliance)} confirmed
+                    </p>
+                    <p className="text-sm text-emerald-700">
+                      Added {Number(confirmedKwh).toFixed(3)} kWh to{' '}
+                      {formatApplianceName(event.confirmed_appliance)}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {event.status === 'eliminated' && (
+                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800">
+                  Classified as other
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ApplianceConsumption({ trayState }) {
+  if (!trayState?.total_confirmed_kwh) return null;
+
+  const entries = Object.entries(trayState.total_confirmed_kwh)
+    .filter(([, kwh]) => Number(kwh) > 0)
+    .sort(([, a], [, b]) => Number(b) - Number(a));
+
+  if (!entries.length) return null;
+
+  const tariff = Number(localStorage.getItem('wattlab_tariff') || 8.5);
+  const durations = (trayState.active_events || []).reduce((acc, event) => {
+    if (event.confirmed_appliance) {
+      acc[event.confirmed_appliance] = Math.max(
+        acc[event.confirmed_appliance] || 0,
+        Number(event.elapsed_seconds || 0)
+      );
+    }
+    return acc;
+  }, {});
+
+  return (
+    <div className="mt-6 border-t border-emerald-100 pt-5">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-emerald-600 mb-3">
+        Session summary
+      </h3>
+      <div className="overflow-x-auto rounded-lg border border-emerald-100 bg-white">
+        <table className="w-full min-w-[520px] text-left text-sm">
+          <thead>
+            <tr className="border-b border-emerald-100 text-emerald-600">
+              <th className="px-4 py-3 font-semibold">Appliance</th>
+              <th className="px-4 py-3 font-semibold">Duration</th>
+              <th className="px-4 py-3 font-semibold">kWh</th>
+              <th className="px-4 py-3 font-semibold">Est. Cost (Rs)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map(([appliance, kwh]) => (
+              <tr key={appliance} className="border-b border-emerald-50">
+                <td className="px-4 py-3 font-medium capitalize text-emerald-900">
+                  {formatApplianceName(appliance)}
+                </td>
+                <td className="px-4 py-3 text-emerald-700">
+                  {durations[appliance] ? `${Math.round(durations[appliance])}s` : '-'}
+                </td>
+                <td className="px-4 py-3 tabular-nums text-emerald-700">
+                  {Number(kwh).toFixed(3)}
+                </td>
+                <td className="px-4 py-3 tabular-nums text-emerald-700">
+                  {(Number(kwh) * tariff).toFixed(2)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function LiveDashboard() {
   const [deviceId, setDeviceId] = useState(initialDeviceId);
   const [live, setLive] = useState(null);
@@ -108,6 +301,8 @@ export default function LiveDashboard() {
   const [predictionError, setPredictionError] = useState(null);
   const [activityPrediction, setActivityPrediction] = useState(null);
   const [activityError, setActivityError] = useState(null);
+  const [trayState, setTrayState] = useState(null);
+  const [trayError, setTrayError] = useState(null);
 
   useEffect(() => {
     localStorage.setItem('wattlab_device_id', deviceId);
@@ -158,6 +353,16 @@ export default function LiveDashboard() {
     }
   }, [deviceId]);
 
+  const fetchTrayState = useCallback(async () => {
+    try {
+      const { data } = await api.get('/tray/state');
+      setTrayState(data);
+      setTrayError(null);
+    } catch (err) {
+      setTrayError(err.response?.data?.message || err.message || 'Candidate tray unavailable');
+    }
+  }, []);
+
   const fetchCharts = useCallback(async () => {
     setLoadingCharts(true);
     setChartsError(null);
@@ -194,6 +399,12 @@ export default function LiveDashboard() {
     const id = setInterval(fetchActivityPrediction, 4000);
     return () => clearInterval(id);
   }, [fetchActivityPrediction]);
+
+  useEffect(() => {
+    fetchTrayState();
+    const id = setInterval(fetchTrayState, 10000);
+    return () => clearInterval(id);
+  }, [fetchTrayState]);
 
   useEffect(() => {
     fetchCharts();
@@ -260,6 +471,7 @@ export default function LiveDashboard() {
                 fetchCharts();
                 fetchLatestPrediction();
                 fetchActivityPrediction();
+                fetchTrayState();
               }}
               className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
             >
@@ -371,6 +583,9 @@ export default function LiveDashboard() {
               ))}
             </div>
           )}
+
+          <CandidateTray trayState={trayState} trayError={trayError} />
+          <ApplianceConsumption trayState={trayState} />
 
           {runningAppliances.length > 0 && (
           <div className="mt-6 border-t border-emerald-100 pt-4">
