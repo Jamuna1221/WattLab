@@ -3,42 +3,8 @@ import { AlertTriangle, CheckCheck, X } from 'lucide-react';
 import SharedLayout from '../components/SharedLayout';
 import { supabase } from '../supabaseClient';
 
-const mockAlerts = [
-  {
-    id: 1,
-    severity: 'high',
-    title: 'Unusual power spike detected',
-    message: 'Power jumped to 4200W at 2:34 PM - possible appliance fault.',
-    timestamp: new Date(Date.now() - 3600000).toISOString(),
-    read: false,
-  },
-  {
-    id: 2,
-    severity: 'medium',
-    title: 'High consumption day',
-    message: "Today's usage is 40% above your daily average.",
-    timestamp: new Date(Date.now() - 7200000).toISOString(),
-    read: false,
-  },
-  {
-    id: 3,
-    severity: 'low',
-    title: 'Fridge model trained',
-    message: 'Fridge classifier ready - 78.7% accuracy on UK-DALE dataset.',
-    timestamp: new Date(Date.now() - 86400000).toISOString(),
-    read: true,
-  },
-  {
-    id: 4,
-    severity: 'low',
-    title: 'Device connected',
-    message: 'SIM-DEVICE-001 successfully linked to your account.',
-    timestamp: new Date(Date.now() - 172800000).toISOString(),
-    read: true,
-  },
-];
-
 function relativeTime(timestamp) {
+  if (!timestamp) return 'recently';
   const diff = Date.now() - new Date(timestamp).getTime();
   const hours = Math.max(1, Math.round(diff / 3600000));
   if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
@@ -53,24 +19,25 @@ const severityStyles = {
 };
 
 export default function AlertsPage() {
-  const [alerts, setAlerts] = useState(mockAlerts);
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
-  const [usingFallback, setUsingFallback] = useState(false);
 
   useEffect(() => {
     async function load() {
+      setLoading(false);
       try {
         const { data, error } = await supabase
           .from('alerts')
           .select('id, severity, title, message, timestamp, read')
           .order('timestamp', { ascending: false })
           .limit(50);
-        if (error || !data?.length) throw error || new Error('No alerts');
-        setAlerts(data);
-        setUsingFallback(false);
+        if (error) throw error;
+        setAlerts(data || []);
       } catch {
-        setAlerts(mockAlerts);
-        setUsingFallback(true);
+        setAlerts([]);
+      } finally {
+        setLoading(false);
       }
     }
     load();
@@ -82,6 +49,18 @@ export default function AlertsPage() {
     if (filter === 'unread') return alerts.filter((alert) => !alert.read);
     return alerts.filter((alert) => alert.severity === filter);
   }, [alerts, filter]);
+
+  async function markAllRead() {
+    const ids = alerts.filter((a) => !a.read).map((a) => a.id);
+    if (ids.length === 0) return;
+    await supabase.from('alerts').update({ read: true }).in('id', ids);
+    setAlerts(alerts.map((alert) => ({ ...alert, read: true })));
+  }
+
+  async function markRead(id) {
+    await supabase.from('alerts').update({ read: true }).eq('id', id);
+    setAlerts(alerts.map((item) => (item.id === id ? { ...item, read: true } : item)));
+  }
 
   return (
     <SharedLayout activePage="alerts">
@@ -98,19 +77,13 @@ export default function AlertsPage() {
           </div>
           <button
             type="button"
-            onClick={() => setAlerts(alerts.map((alert) => ({ ...alert, read: true })))}
+            onClick={markAllRead}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
           >
             <CheckCheck className="w-4 h-4" />
             Mark all read
           </button>
         </div>
-
-        {usingFallback && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Alerts table is unavailable, so sample alerts are shown.
-          </p>
-        )}
 
         <div className="flex flex-wrap gap-2">
           {['all', 'unread', 'high', 'medium', 'low'].map((tab) => (
@@ -128,6 +101,12 @@ export default function AlertsPage() {
             </button>
           ))}
         </div>
+
+        {visibleAlerts.length === 0 && !loading && (
+          <div className="rounded-xl border border-emerald-100 bg-white p-8 text-center text-emerald-700 shadow-sm">
+            No alerts found. Everything is operating normally.
+          </div>
+        )}
 
         <div className="space-y-4">
           {visibleAlerts.map((alert) => (
@@ -163,9 +142,7 @@ export default function AlertsPage() {
                     {!alert.read && (
                       <button
                         type="button"
-                        onClick={() =>
-                          setAlerts(alerts.map((item) => (item.id === alert.id ? { ...item, read: true } : item)))
-                        }
+                        onClick={() => markRead(alert.id)}
                         className="rounded-full border border-emerald-100 p-1.5 text-emerald-600 hover:bg-emerald-50"
                         aria-label="Mark as read"
                       >

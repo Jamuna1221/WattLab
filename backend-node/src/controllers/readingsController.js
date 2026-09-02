@@ -87,3 +87,24 @@ exports.getWeeklySummary = async (req, res) => {
   }
 };
 
+exports.getMonthlySummary = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const summary = await readingsService.getMonthlySummary(deviceId);
+    return res.status(200).json({ success: true, summary });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.getApplianceBreakdown = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const timeframe = req.query.timeframe || 'monthly';
+    const breakdown = await readingsService.getApplianceBreakdown(deviceId, timeframe);
+    return res.status(200).json({ success: true, breakdown });
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+};
+

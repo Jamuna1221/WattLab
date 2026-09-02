@@ -66,3 +66,13 @@ exports.runBulbActivityPrediction = async (req, res) => {
   }
 };
 
+exports.getHealth = async (req, res) => {
+  try {
+    const health = await predictionsService.getFlaskHealth();
+    return res.status(200).json(health);
+  } catch (err) {
+    return res.status(500).json({ status: 'offline', error: err.message });
+  }
+};
+
+

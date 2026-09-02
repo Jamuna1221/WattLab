@@ -1,134 +1,107 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Zap, Users, Activity, AlertTriangle, TrendingUp,
-  LogOut, BarChart3, Settings, Shield, DollarSign,
-  LayoutDashboard, UserCog, Bell, Menu, X, UserPlus
+  Zap, Users, Activity, AlertTriangle,
+  LogOut, BarChart3, Settings, Shield,
+  LayoutDashboard, UserCog, Bell, Menu, X, Plus, Cpu
 } from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+const API = 'http://localhost:5000/api';
+
+function getToken() {
+  return localStorage.getItem('adminToken');
+}
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('users');
   const [users, setUsers] = useState([]);
   const [systemStats, setSystemStats] = useState(null);
-  const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showAddUserModal, setShowAddUserModal] = useState(false);
-  const [newUser, setNewUser] = useState({
-    name: '',
-    email: '',
-    password: '',
-    status: 'active'
-  });
+  const [error, setError] = useState(null);
 
-  const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
+  // Create + Assign Device Modal
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [createForm, setCreateForm] = useState({ device_id: '', device_secret: '' });
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState(null);
 
   const handleLogout = () => {
-    localStorage.removeItem('userRole');
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
     navigate('/');
   };
 
   useEffect(() => {
-    fetchData();
+    fetchDashboard();
   }, []);
 
-  const fetchData = async () => {
-    // Demo mode - use mock data
-    const mockUsers = [
-      { id: 1, name: 'John Doe', email: 'john@example.com', total_consumption: 245.5, appliances_count: 5, status: 'active' },
-      { id: 2, name: 'Jane Smith', email: 'jane@example.com', total_consumption: 198.3, appliances_count: 4, status: 'active' },
-      { id: 3, name: 'Bob Johnson', email: 'bob@example.com', total_consumption: 312.7, appliances_count: 6, status: 'active' },
-      { id: 4, name: 'Alice Brown', email: 'alice@example.com', total_consumption: 156.2, appliances_count: 3, status: 'inactive' },
-    ];
-
-    const mockStats = {
-      total_users: 4,
-      active_users: 3,
-      total_appliances: 18,
-      total_consumption: 912.7,
-      total_alerts: 12,
-      system_efficiency: 87.5,
-    };
-
-    const mockAlerts = [
-      { id: 1, user_name: 'Bob Johnson', message: 'Excessive consumption detected', type: 'critical', created_at: new Date() },
-      { id: 2, user_name: 'John Doe', message: 'Appliance malfunction suspected', type: 'warning', created_at: new Date() },
-    ];
-
-    setUsers(mockUsers);
-    setSystemStats(mockStats);
-    setAlerts(mockAlerts);
+  const fetchDashboard = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API}/admin/dashboard`, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setError(data.message || 'Failed to load dashboard');
+      } else {
+        setUsers(data.users || []);
+        setSystemStats(data.stats || null);
+      }
+    } catch (err) {
+      setError('Could not connect to backend. Make sure Node server is running.');
+    }
     setLoading(false);
   };
 
-  const deleteUser = (userId) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
-    
-    // Demo mode - just remove from state
-    setUsers(users.filter(u => u.id !== userId));
+  const openCreateModal = (user) => {
+    setSelectedUser(user);
+    setCreateForm({ device_id: '', device_secret: '' });
+    setCreateError(null);
+    setShowCreateModal(true);
   };
 
-  const handleAddUser = (e) => {
+  const handleCreateDevice = async (e) => {
     e.preventDefault();
-    
-    // Validation
-    if (!newUser.name || !newUser.email || !newUser.password) {
-      alert('Please fill in all fields');
+    if (!createForm.device_id.trim() || !createForm.device_secret.trim()) {
+      setCreateError('Both Device ID and Device Secret are required.');
       return;
     }
-
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newUser.email)) {
-      alert('Please enter a valid email address');
-      return;
+    setCreateLoading(true);
+    setCreateError(null);
+    try {
+      const res = await fetch(`${API}/admin/create-device`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getToken()}`
+        },
+        body: JSON.stringify({
+          device_id: createForm.device_id.trim(),
+          device_secret: createForm.device_secret.trim(),
+          user_id: selectedUser.id
+        })
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setCreateError(data.message || 'Failed to create device');
+      } else {
+        setShowCreateModal(false);
+        fetchDashboard();
+      }
+    } catch (err) {
+      setCreateError('Network error. Try again.');
     }
-
-    // Demo mode - add to state with mock data
-    const newUserData = {
-      id: users.length + 1,
-      name: newUser.name,
-      email: newUser.email,
-      total_consumption: 0,
-      appliances_count: 0,
-      status: newUser.status
-    };
-
-    setUsers([...users, newUserData]);
-    
-    // Update system stats
-    setSystemStats({
-      ...systemStats,
-      total_users: (systemStats?.total_users || 0) + 1,
-      active_users: newUser.status === 'active' ? (systemStats?.active_users || 0) + 1 : systemStats?.active_users
-    });
-
-    // Reset form and close modal
-    setNewUser({ name: '', email: '', password: '', status: 'active' });
-    setShowAddUserModal(false);
-    
-    alert('User added successfully!');
+    setCreateLoading(false);
   };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setNewUser(prev => ({ ...prev, [name]: value }));
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-teal-50 to-green-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-      </div>
-    );
-  }
 
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'users', label: 'Users', icon: UserCog },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'alerts', label: 'Alerts', icon: Bell },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -137,17 +110,11 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-green-50 flex">
       {/* Mobile Overlay */}
       {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
-      
+
       {/* Sidebar */}
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white/80 backdrop-blur-lg border-r border-emerald-100 shadow-lg min-h-screen flex flex-col transform transition-transform duration-300 ease-in-out ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-      }`}>
-        {/* Logo Section */}
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white/80 backdrop-blur-lg border-r border-emerald-100 shadow-lg min-h-screen flex flex-col transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="p-4 sm:p-6 border-b border-emerald-100">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -159,16 +126,12 @@ export default function AdminDashboard() {
                 <p className="text-xs text-emerald-600">Admin Panel</p>
               </div>
             </div>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="lg:hidden text-emerald-700 hover:text-emerald-900"
-            >
+            <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-emerald-700 hover:text-emerald-900">
               <X className="w-6 h-6" />
             </button>
           </div>
         </div>
 
-        {/* Navigation Menu */}
         <nav className="flex-1 p-4">
           <div className="space-y-1">
             {menuItems.map((item) => {
@@ -176,15 +139,8 @@ export default function AdminDashboard() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    setSidebarOpen(false);
-                  }}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-                    activeTab === item.id
-                      ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30'
-                      : 'text-emerald-700 hover:bg-emerald-50 hover:text-emerald-600'
-                  }`}
+                  onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${activeTab === item.id ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30' : 'text-emerald-700 hover:bg-emerald-50 hover:text-emerald-600'}`}
                 >
                   <Icon className="w-5 h-5" />
                   <span className="font-medium">{item.label}</span>
@@ -194,7 +150,6 @@ export default function AdminDashboard() {
           </div>
         </nav>
 
-        {/* User Info & Logout */}
         <div className="p-4 border-t border-emerald-100">
           <div className="bg-emerald-50 rounded-lg p-3 mb-3">
             <p className="text-emerald-900 text-sm font-semibold">Administrator</p>
@@ -212,502 +167,260 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto flex flex-col w-full">
-        {/* Top Header Bar */}
+        {/* Top Header */}
         <header className="bg-white/80 backdrop-blur-lg border-b border-emerald-100 shadow-sm sticky top-0 z-30">
-          <div className="px-4 sm:px-6 py-3 sm:py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={() => setSidebarOpen(true)}
-                  className="lg:hidden text-emerald-700 hover:text-emerald-900"
-                >
-                  <Menu className="w-6 h-6" />
-                </button>
-                <div>
-                  <h1 className="text-lg sm:text-2xl font-bold text-emerald-900">WattLab Admin</h1>
-                  <p className="text-xs sm:text-sm text-emerald-600 mt-1 hidden sm:block">Monitor and manage your energy monitoring system</p>
-                </div>
+          <div className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-emerald-700 hover:text-emerald-900">
+                <Menu className="w-6 h-6" />
+              </button>
+              <div>
+                <h1 className="text-lg sm:text-2xl font-bold text-emerald-900">WattLab Admin</h1>
+                <p className="text-xs sm:text-sm text-emerald-600 hidden sm:block">Monitor and manage your energy monitoring system</p>
               </div>
-              <div className="flex items-center space-x-3">
-                <div className="bg-emerald-50 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg hidden md:block">
-                  <p className="text-emerald-900 text-xs sm:text-sm font-semibold">Administrator</p>
-                  <p className="text-emerald-600 text-xs">admin@wattlab.com</p>
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="lg:hidden flex items-center space-x-1 px-3 py-1.5 bg-gradient-to-r from-red-500 to-orange-600 text-white rounded-lg text-sm"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
+            </div>
+            <div className="hidden md:block bg-emerald-50 px-4 py-2 rounded-lg">
+              <p className="text-emerald-900 text-sm font-semibold">Administrator</p>
+              <p className="text-emerald-600 text-xs">admin@wattlab.com</p>
             </div>
           </div>
         </header>
 
         <div className="px-4 sm:px-6 py-4 sm:py-8 flex-1">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <div className="bg-white/80 backdrop-blur-sm border border-emerald-100 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-emerald-700 text-xs sm:text-sm font-medium">Total Users</p>
-                <p className="text-2xl sm:text-3xl font-bold text-emerald-900 mt-1">{systemStats?.total_users || 0}</p>
-                <p className="text-xs text-emerald-600 mt-1">Active accounts</p>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+            <div className="bg-white/80 border border-emerald-100 rounded-xl p-4 sm:p-6 shadow-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-emerald-700 text-xs sm:text-sm font-medium">Total Users</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-emerald-900 mt-1">{loading ? '…' : (systemStats?.total_users ?? 0)}</p>
+                  <p className="text-xs text-emerald-600 mt-1">Registered accounts</p>
+                </div>
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-lg flex items-center justify-center">
+                  <Users className="w-6 h-6 text-emerald-600" />
+                </div>
               </div>
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-lg flex items-center justify-center">
-                <Users className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
+            </div>
+
+            <div className="bg-white/80 border border-emerald-100 rounded-xl p-4 sm:p-6 shadow-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-emerald-700 text-xs sm:text-sm font-medium">Total Devices</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-emerald-900 mt-1">{loading ? '…' : (systemStats?.total_appliances ?? 0)}</p>
+                  <p className="text-xs text-emerald-600 mt-1">Registered in system</p>
+                </div>
+                <div className="w-12 h-12 bg-gradient-to-br from-teal-100 to-cyan-100 rounded-lg flex items-center justify-center">
+                  <Cpu className="w-6 h-6 text-teal-600" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white/80 border border-emerald-100 rounded-xl p-4 sm:p-6 shadow-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-emerald-700 text-xs sm:text-sm font-medium">Active Users</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-emerald-900 mt-1">{loading ? '…' : (systemStats?.active_users ?? 0)}</p>
+                  <p className="text-xs text-emerald-600 mt-1">With devices assigned</p>
+                </div>
+                <div className="w-12 h-12 bg-gradient-to-br from-cyan-100 to-emerald-100 rounded-lg flex items-center justify-center">
+                  <Activity className="w-6 h-6 text-cyan-600" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white/80 border border-emerald-100 rounded-xl p-4 sm:p-6 shadow-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-emerald-700 text-xs sm:text-sm font-medium">System Health</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-emerald-900 mt-1">{systemStats?.system_efficiency ?? 95}%</p>
+                  <p className="text-xs text-emerald-600 mt-1">Operational efficiency</p>
+                </div>
+                <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-amber-100 rounded-lg flex items-center justify-center">
+                  <Zap className="w-6 h-6 text-orange-600" />
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-sm border border-emerald-100 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-emerald-700 text-xs sm:text-sm font-medium">Total Appliances</p>
-                <p className="text-2xl sm:text-3xl font-bold text-emerald-900 mt-1">{systemStats?.total_appliances || 0}</p>
-                <p className="text-xs text-emerald-600 mt-1">Registered devices</p>
-              </div>
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-teal-100 to-cyan-100 rounded-lg flex items-center justify-center">
-                <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-teal-600" />
-              </div>
+          {/* Error Banner */}
+          {error && (
+            <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+              <p className="text-red-700 text-sm">{error}</p>
+              <button onClick={fetchDashboard} className="ml-auto text-xs bg-red-100 text-red-700 px-3 py-1 rounded-lg hover:bg-red-200">Retry</button>
             </div>
-          </div>
+          )}
 
-          <div className="bg-white/80 backdrop-blur-sm border border-emerald-100 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-emerald-700 text-xs sm:text-sm font-medium">System Consumption</p>
-                <p className="text-2xl sm:text-3xl font-bold text-emerald-900 mt-1">
-                  {systemStats?.total_consumption?.toFixed(2) || '912.70'}
-                </p>
-                <p className="text-xs text-emerald-600 mt-1">kWh (Last 30 days)</p>
-              </div>
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-cyan-100 to-emerald-100 rounded-lg flex items-center justify-center">
-                <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white/80 backdrop-blur-sm border border-emerald-100 rounded-xl p-4 sm:p-6 shadow-lg hover:shadow-xl transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-emerald-700 text-xs sm:text-sm font-medium">Active Alerts</p>
-                <p className="text-2xl sm:text-3xl font-bold text-emerald-900 mt-1">{systemStats?.total_alerts || 2}</p>
-                <p className="text-xs text-orange-600 mt-1">Requires attention</p>
-              </div>
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-orange-100 to-amber-100 rounded-lg flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            {/* Consumption Trend */}
-            <div className="bg-white/80 backdrop-blur-sm border border-emerald-100 rounded-xl p-4 sm:p-6 shadow-lg">
-              <h3 className="text-base sm:text-lg font-semibold text-emerald-900 mb-4">System Consumption Trend (Last 7 Days)</h3>
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={[
-                  { date: '2026-02-06', total_consumption: 125 },
-                  { date: '2026-02-07', total_consumption: 138 },
-                  { date: '2026-02-08', total_consumption: 142 },
-                  { date: '2026-02-09', total_consumption: 135 },
-                  { date: '2026-02-10', total_consumption: 148 },
-                  { date: '2026-02-11', total_consumption: 152 },
-                  { date: '2026-02-12', total_consumption: 145 },
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#d1fae5" />
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="#059669"
-                    tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  />
-                  <YAxis stroke="#059669" />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #d1fae5', borderRadius: '8px' }}
-                    labelStyle={{ color: '#064e3b' }}
-                    labelFormatter={(date) => new Date(date).toLocaleDateString()}
-                  />
-                  <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="total_consumption" 
-                    stroke="#10b981" 
-                    strokeWidth={3}
-                    name="Total Consumption (kWh)"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Top Consuming Users */}
-            <div className="bg-white/80 backdrop-blur-sm border border-emerald-100 rounded-xl p-4 sm:p-6 shadow-lg">
-              <h3 className="text-base sm:text-lg font-semibold text-emerald-900 mb-4">Top Consuming Users (Last 30 Days)</h3>
-              <div className="space-y-3">
-                {users.slice(0, 3).sort((a, b) => b.total_consumption - a.total_consumption).map((topUser, index) => (
-                  <div key={topUser.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-lg hover:shadow-md transition-shadow space-y-3 sm:space-y-0">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-full flex items-center justify-center shadow-md flex-shrink-0">
-                        <span className="text-white font-bold text-xs sm:text-sm">#{index + 1}</span>
-                      </div>
-                      <div>
-                        <p className="text-emerald-900 font-semibold text-sm sm:text-base">{topUser.name}</p>
-                        <p className="text-emerald-600 text-xs sm:text-sm">{topUser.email}</p>
-                      </div>
-                    </div>
-                    <div className="text-left sm:text-right pl-11 sm:pl-0">
-                      <p className="text-emerald-900 font-bold text-sm sm:text-base">{parseFloat(topUser.total_consumption || 0).toFixed(2)} kWh</p>
-                      <p className="text-emerald-600 text-xs sm:text-sm">Total Consumption</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Users Tab */}
-        {activeTab === 'users' && (
-          <div className="bg-white/80 backdrop-blur-sm border border-emerald-100 rounded-xl overflow-hidden shadow-lg">
-            <div className="p-4 sm:p-6 border-b border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-3 sm:space-y-0">
-              <div>
+          {/* Users Tab */}
+          {activeTab === 'users' && (
+            <div className="bg-white/80 border border-emerald-100 rounded-xl overflow-hidden shadow-lg">
+              <div className="p-4 sm:p-6 border-b border-emerald-200">
                 <h3 className="text-base sm:text-lg font-semibold text-emerald-900">User Management</h3>
-                <p className="text-emerald-700 text-xs sm:text-sm mt-1">Manage and monitor all registered users</p>
+                <p className="text-emerald-600 text-sm mt-1">
+                  All registered users. Click <strong>Add &amp; Assign Device</strong> to create a new device and link it to the user.
+                </p>
               </div>
-              <button
-                onClick={() => setShowAddUserModal(true)}
-                className="flex items-center space-x-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-4 py-2 rounded-lg font-medium transition-all transform hover:scale-105 shadow-lg shadow-emerald-500/30 text-sm"
-              >
-                <UserPlus className="w-5 h-5" />
-                <span>Add User</span>
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px]">
-                <thead className="bg-gradient-to-r from-emerald-100 to-teal-100">
-                  <tr>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-semibold text-emerald-900 uppercase tracking-wider">
-                      User
-                    </th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-semibold text-emerald-900 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-semibold text-emerald-900 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-semibold text-emerald-900 uppercase tracking-wider">
-                      Consumption
-                    </th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-semibold text-emerald-900 uppercase tracking-wider">
-                      Appliances
-                    </th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-semibold text-emerald-900 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-emerald-100">
-                  {users.map((userData) => (
-                    <tr key={userData.id} className="hover:bg-emerald-50 transition-colors">
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-full flex items-center justify-center">
-                            <Users className="w-5 h-5 text-emerald-600" />
-                          </div>
-                          <div className="ml-3">
-                            <p className="text-emerald-900 font-semibold text-sm">{userData.name}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                        <p className="text-emerald-700 text-sm">{userData.email}</p>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          userData.status === 'active'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {userData.status}
-                        </span>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                        <p className="text-emerald-900 font-semibold text-sm">{userData.total_consumption.toFixed(2)} kWh</p>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                        <p className="text-emerald-700 text-sm">{userData.appliances_count} devices</p>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                        <button
-                          onClick={() => deleteUser(userData.id)}
-                          className="text-red-600 hover:text-red-800 text-sm font-medium"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
-        {/* Analytics Tab */}
-        {activeTab === 'analytics' && (
-          <div className="space-y-4 sm:space-y-6">
-            <div className="bg-white/80 backdrop-blur-sm border border-emerald-100 rounded-xl p-4 sm:p-6 shadow-lg">
-              <h3 className="text-base sm:text-lg font-semibold text-emerald-900 mb-4">System Analytics</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-                <div className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-lg">
-                  <p className="text-emerald-700 text-sm font-medium">Average Consumption/User</p>
-                  <p className="text-2xl font-bold text-emerald-900 mt-2">
-                    {(systemStats?.total_consumption / systemStats?.total_users || 228.18).toFixed(2)} kWh
-                  </p>
+              {loading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500" />
                 </div>
-                <div className="p-4 bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-200 rounded-lg">
-                  <p className="text-teal-700 text-sm font-medium">Appliances/User Ratio</p>
-                  <p className="text-2xl font-bold text-teal-900 mt-2">
-                    {(systemStats?.total_appliances / systemStats?.total_users || 4.5).toFixed(1)}
-                  </p>
-                </div>
-                <div className="p-4 bg-gradient-to-br from-cyan-50 to-emerald-50 border border-cyan-200 rounded-lg">
-                  <p className="text-cyan-700 text-sm font-medium">Alert Rate</p>
-                  <p className="text-2xl font-bold text-cyan-900 mt-2">
-                    {systemStats?.total_alerts || 2} active
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-sm border border-emerald-100 rounded-xl p-4 sm:p-6 shadow-lg">
-              <h3 className="text-base sm:text-lg font-semibold text-emerald-900 mb-4">Weekly Consumption Trend</h3>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={[
-                  { date: '2026-02-06', total_consumption: 125 },
-                  { date: '2026-02-07', total_consumption: 138 },
-                  { date: '2026-02-08', total_consumption: 142 },
-                  { date: '2026-02-09', total_consumption: 135 },
-                  { date: '2026-02-10', total_consumption: 148 },
-                  { date: '2026-02-11', total_consumption: 152 },
-                  { date: '2026-02-12', total_consumption: 145 },
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#d1fae5" />
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="#059669"
-                    tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}
-                  />
-                  <YAxis stroke="#059669" />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #d1fae5', borderRadius: '8px' }}
-                    labelStyle={{ color: '#064e3b' }}
-                  />
-                  <Legend />
-                  <Bar dataKey="total_consumption" fill="#10b981" name="Consumption (kWh)" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-
-        {/* Alerts Tab */}
-        {activeTab === 'alerts' && (
-          <div className="space-y-4">
-            <div className="bg-white/80 backdrop-blur-sm border border-emerald-100 rounded-xl p-4 sm:p-6 shadow-lg">
-              <h3 className="text-base sm:text-lg font-semibold text-emerald-900 mb-4">System Alerts</h3>
-              {alerts.length > 0 ? (
-                <div className="space-y-3">
-                  {alerts.map((alert) => (
-                    <div key={alert.id} className="flex items-start space-x-2 sm:space-x-3 p-3 sm:p-4 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg">
-                      <AlertTriangle className={`w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 mt-1 ${
-                        alert.type === 'critical' ? 'text-red-600' : 'text-orange-600'
-                      }`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 space-y-2 sm:space-y-0">
-                          <div className="min-w-0">
-                            <h4 className="text-emerald-900 font-semibold text-sm sm:text-base">{alert.message}</h4>
-                            <p className="text-emerald-700 text-xs sm:text-sm">User: {alert.user_name}</p>
-                          </div>
-                          <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold self-start ${
-                            alert.type === 'critical' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
-                          }`}>
-                            {alert.type}
-                          </span>
-                        </div>
-                        <p className="text-emerald-600 text-xs">
-                          {new Date(alert.created_at).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              ) : users.length === 0 ? (
+                <div className="py-16 text-center text-emerald-600">No users found in database.</div>
               ) : (
-                <p className="text-emerald-700 text-center py-8">No alerts to display</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[700px]">
+                    <thead className="bg-gradient-to-r from-emerald-100 to-teal-100">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-emerald-900 uppercase tracking-wider">User</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-emerald-900 uppercase tracking-wider">Email</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-emerald-900 uppercase tracking-wider">Status</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-emerald-900 uppercase tracking-wider">Assigned Devices</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-emerald-900 uppercase tracking-wider">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-emerald-100">
+                      {users.map((user) => (
+                        <tr key={user.id} className="hover:bg-emerald-50 transition-colors">
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                <Users className="w-4 h-4 text-emerald-600" />
+                              </div>
+                              <p className="text-emerald-900 font-semibold text-sm">{user.name || <span className="text-gray-400 italic">No name</span>}</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-emerald-700 text-sm">{user.email}</td>
+                          <td className="px-4 py-4">
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${user.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                              {user.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4">
+                            {user.devices && user.devices.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {user.devices.map(d => (
+                                  <span key={d} className="bg-teal-100 text-teal-800 text-xs font-mono font-medium px-2 py-0.5 rounded-md">{d}</span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-xs italic">No device assigned</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
+                            <button
+                              onClick={() => openCreateModal(user)}
+                              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              Add &amp; Assign Device
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Settings Tab */}
-        {activeTab === 'settings' && (
-          <div className="space-y-4 sm:space-y-6">
-            <div className="bg-white/80 backdrop-blur-sm border border-emerald-100 rounded-xl p-4 sm:p-6 shadow-lg">
-              <h3 className="text-base sm:text-lg font-semibold text-emerald-900 mb-4 sm:mb-6">System Settings</h3>
-              <div className="space-y-4 sm:space-y-6">
-                <div className="p-4 sm:p-5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-lg">
-                  <h4 className="text-emerald-900 font-semibold mb-2 text-sm sm:text-base">Alert Retention</h4>
-                  <p className="text-emerald-700 text-xs sm:text-sm mb-3">Configure how long alerts are stored in the system</p>
-                  <input
-                    type="number"
-                    defaultValue={30}
-                    className="bg-white border-2 border-emerald-200 text-emerald-900 px-3 sm:px-4 py-2 rounded-lg w-24 sm:w-32 text-sm focus:outline-none focus:border-emerald-500"
-                  />
-                  <span className="text-emerald-700 ml-2 font-medium text-sm">days</span>
+          {activeTab === 'overview' && (
+            <div className="bg-white/80 border border-emerald-100 rounded-xl p-6 shadow-lg">
+              <h3 className="text-lg font-semibold text-emerald-900 mb-2">Overview</h3>
+              <p className="text-emerald-600 text-sm">Go to <strong>Users</strong> tab to manage users and assign devices.</p>
+            </div>
+          )}
+
+          {activeTab === 'alerts' && (
+            <div className="bg-white/80 border border-emerald-100 rounded-xl p-6 shadow-lg">
+              <h3 className="text-lg font-semibold text-emerald-900 mb-4">System Alerts</h3>
+              <p className="text-emerald-500 text-sm text-center py-8">No active alerts.</p>
+            </div>
+          )}
+
+          {activeTab === 'settings' && (
+            <div className="bg-white/80 border border-emerald-100 rounded-xl p-6 shadow-lg">
+              <h3 className="text-lg font-semibold text-emerald-900 mb-4">System Settings</h3>
+              <div className="space-y-4">
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                  <p className="text-emerald-700 text-sm font-medium">Electricity Tariff</p>
+                  <p className="text-emerald-600 text-xs mt-1">Default: ₹8.50/kWh (users can override in their Settings page)</p>
                 </div>
-
-                <div className="p-4 sm:p-5 bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-lg">
-                  <h4 className="text-emerald-900 font-semibold mb-2 text-sm sm:text-base">Data Retention</h4>
-                  <p className="text-emerald-700 text-xs sm:text-sm mb-3">Configure how long energy consumption data is retained</p>
-                  <input
-                    type="number"
-                    defaultValue={365}
-                    className="bg-white border-2 border-teal-200 text-emerald-900 px-3 sm:px-4 py-2 rounded-lg w-24 sm:w-32 text-sm focus:outline-none focus:border-teal-500"
-                  />
-                  <span className="text-emerald-700 ml-2 font-medium text-sm">days</span>
+                <div className="p-4 bg-teal-50 border border-teal-200 rounded-lg">
+                  <p className="text-teal-700 text-sm font-medium">Data Retention</p>
+                  <p className="text-teal-600 text-xs mt-1">Energy readings are retained indefinitely in Supabase.</p>
                 </div>
-
-                <div className="p-4 sm:p-5 bg-gradient-to-r from-cyan-50 to-emerald-50 border border-cyan-200 rounded-lg">
-                  <h4 className="text-emerald-900 font-semibold mb-2 text-sm sm:text-base">Energy Rate</h4>
-                  <p className="text-emerald-700 text-xs sm:text-sm mb-3">Set the current energy rate per kWh</p>
-                  <input
-                    type="number"
-                    step="0.01"
-                    defaultValue={0.12}
-                    className="bg-white border-2 border-cyan-200 text-emerald-900 px-3 sm:px-4 py-2 rounded-lg w-24 sm:w-32 text-sm focus:outline-none focus:border-cyan-500"
-                  />
-                  <span className="text-emerald-700 ml-2 font-medium text-sm">$/kWh</span>
-                </div>
-
-                <button className="w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg shadow-lg shadow-emerald-500/30 transition-all transform hover:scale-105 text-sm sm:text-base">
-                  Save Settings
-                </button>
               </div>
             </div>
-          </div>
-        )}
+          )}
         </div>
       </main>
 
-      {/* Add User Modal */}
-      {showAddUserModal && (
+      {/* Create & Assign Device Modal */}
+      {showCreateModal && selectedUser && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
             <div className="p-6 border-b border-emerald-100">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-lg flex items-center justify-center">
-                    <UserPlus className="w-6 h-6 text-emerald-600" />
-                  </div>
-                  <h3 className="text-xl font-bold text-emerald-900">Add New User</h3>
+                <div>
+                  <h3 className="text-xl font-bold text-emerald-900">Add &amp; Assign Device</h3>
+                  <p className="text-xs text-emerald-600 mt-1">
+                    Assigning to: <span className="font-semibold text-emerald-800">{selectedUser.name || selectedUser.email}</span>
+                    <span className="ml-1 text-gray-400">({selectedUser.email})</span>
+                  </p>
                 </div>
-                <button
-                  onClick={() => {
-                    setShowAddUserModal(false);
-                    setNewUser({ name: '', email: '', password: '', status: 'active' });
-                  }}
-                  className="text-emerald-700 hover:text-emerald-900 transition-colors"
-                >
+                <button onClick={() => setShowCreateModal(false)} className="text-emerald-700 hover:text-emerald-900">
                   <X className="w-6 h-6" />
                 </button>
               </div>
             </div>
 
-            <form onSubmit={handleAddUser} className="p-6 space-y-5">
+            <form onSubmit={handleCreateDevice} className="p-6 space-y-4">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-emerald-700 mb-2">
-                  Full Name *
-                </label>
+                <label className="block text-sm font-medium text-emerald-700 mb-1">Device ID *</label>
                 <input
                   type="text"
-                  id="name"
-                  name="name"
-                  value={newUser.name}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border-2 border-emerald-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-emerald-900"
-                  placeholder="Enter user's full name"
+                  value={createForm.device_id}
+                  onChange={e => setCreateForm(p => ({ ...p, device_id: e.target.value }))}
+                  className="w-full px-4 py-3 border-2 border-emerald-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-emerald-900 font-mono text-sm"
+                  placeholder="e.g. ESP32-HOME-001"
                   required
                 />
+                <p className="text-xs text-gray-400 mt-1">This is what the ESP32 will send in its POST requests.</p>
               </div>
 
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-emerald-700 mb-2">
-                  Email Address *
-                </label>
+                <label className="block text-sm font-medium text-emerald-700 mb-1">Device Secret *</label>
                 <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={newUser.email}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border-2 border-emerald-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-emerald-900"
-                  placeholder="user@example.com"
+                  type="text"
+                  value={createForm.device_secret}
+                  onChange={e => setCreateForm(p => ({ ...p, device_secret: e.target.value }))}
+                  className="w-full px-4 py-3 border-2 border-emerald-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-emerald-900 font-mono text-sm"
+                  placeholder="e.g. mySecretKey123"
                   required
                 />
+                <p className="text-xs text-gray-400 mt-1">Flash this secret onto the ESP32 firmware. It's stored hashed.</p>
               </div>
 
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-emerald-700 mb-2">
-                  Password *
-                </label>
-                <input
-                  type="password"
-                  id="password"
-                  name="password"
-                  value={newUser.password}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border-2 border-emerald-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-emerald-900"
-                  placeholder="Enter password"
-                  required
-                  minLength={6}
-                />
-                <p className="text-xs text-emerald-600 mt-1">Minimum 6 characters</p>
-              </div>
+              {createError && (
+                <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{createError}</p>
+              )}
 
-              <div>
-                <label htmlFor="status" className="block text-sm font-medium text-emerald-700 mb-2">
-                  Account Status
-                </label>
-                <select
-                  id="status"
-                  name="status"
-                  value={newUser.status}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border-2 border-emerald-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all text-emerald-900 bg-white"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-
-              <div className="flex space-x-3 pt-4">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowAddUserModal(false);
-                    setNewUser({ name: '', email: '', password: '', status: 'active' });
-                  }}
+                  onClick={() => setShowCreateModal(false)}
                   className="flex-1 px-4 py-3 border-2 border-emerald-200 text-emerald-700 rounded-lg font-medium hover:bg-emerald-50 transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-4 py-3 rounded-lg font-medium transition-all transform hover:scale-105 shadow-lg shadow-emerald-500/30"
+                  disabled={createLoading}
+                  className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-4 py-3 rounded-lg font-medium transition-all shadow-lg shadow-emerald-500/30 disabled:opacity-60"
                 >
-                  Add User
+                  {createLoading ? 'Assigning…' : 'Create & Assign'}
                 </button>
               </div>
             </form>

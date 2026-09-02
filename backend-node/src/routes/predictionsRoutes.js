@@ -4,6 +4,7 @@ const router = express.Router();
 const predictionsController = require('../controllers/predictionsController');
 const predictionsService = require('../services/predictionsService');
 
+router.get('/health', predictionsController.getHealth);
 router.get('/bulb/:deviceId', predictionsController.getLatestBulbPrediction);
 router.post('/bulb/:deviceId/run', predictionsController.runBulbPrediction);
 router.get('/activity/:deviceId', predictionsController.getBulbActivityPrediction);

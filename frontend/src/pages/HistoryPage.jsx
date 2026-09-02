@@ -2,15 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Download, History } from 'lucide-react';
 import SharedLayout from '../components/SharedLayout';
 import { supabase } from '../supabaseClient';
-
-function createMockRows() {
-  return Array.from({ length: 20 }, (_, i) => ({
-    timestamp: new Date(Date.now() - i * 6000).toISOString(),
-    power: Number((100 + Math.random() * 400).toFixed(1)),
-    stream_type: 'aggregate',
-    appliance_label: '',
-  }));
-}
+import { useDeviceId } from '../hooks/useDeviceId';
 
 function exportCSV(rows) {
   const header = 'Timestamp,Power(W),Type,Label\n';
@@ -21,7 +13,7 @@ function exportCSV(rows) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'smartshakthi_readings.csv';
+  a.download = 'wattlab_readings.csv';
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -34,33 +26,37 @@ function powerClass(power) {
 }
 
 export default function HistoryPage() {
-  const [rows, setRows] = useState(() => createMockRows());
+  const { deviceId } = useDeviceId();
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState(null);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(0);
-  const [usingFallback, setUsingFallback] = useState(false);
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
+      setErrorMsg(null);
       try {
-        const deviceId = localStorage.getItem('wattlab_device_id') || 'SIM-DEVICE-001';
         const { data, error } = await supabase
-          .from('readings')
+          .from('energy_readings')
           .select('timestamp, power, stream_type, appliance_label')
           .eq('device_id', deviceId)
           .order('timestamp', { ascending: false })
-          .limit(100);
+          .limit(200);
 
-        if (error || !data?.length) throw error || new Error('No rows');
-        setRows(data);
-        setUsingFallback(false);
-      } catch {
-        setRows(createMockRows());
-        setUsingFallback(true);
+        if (error) throw error;
+        setRows(data || []);
+      } catch (err) {
+        setRows([]);
+        setErrorMsg(err.message || 'Unable to load readings');
+      } finally {
+        setLoading(false);
       }
     }
     load();
-  }, []);
+  }, [deviceId]);
 
   const filtered = useMemo(() => {
     return rows.filter((row) => {
@@ -122,9 +118,15 @@ export default function HistoryPage() {
           </div>
         </div>
 
-        {usingFallback && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Supabase history is unavailable, so mock readings are shown.
+        {errorMsg && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {errorMsg}
+          </p>
+        )}
+
+        {!loading && rows.length === 0 && !errorMsg && (
+          <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            No energy readings found for this device yet. Start your ESP32 sensor or simulator script (09_simulate_esp32.py) to populate live data.
           </p>
         )}
 

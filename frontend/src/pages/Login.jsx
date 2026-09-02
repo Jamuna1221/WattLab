@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Zap, Mail, Lock } from 'lucide-react';
 import loginBg from '../assets/wattlabloginpage.png';
+import { persistLoginData } from '../utils/session';
 
 
 export default function Login() {
@@ -32,8 +33,7 @@ const handleSubmit = async (e) => {
       throw new Error(data.message);
     }
 
-    // Store token
-    localStorage.setItem("token", data.session.access_token);
+    persistLoginData(data);
 
     navigate("/dashboard");
   } catch (err) {

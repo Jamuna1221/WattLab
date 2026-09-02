@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -12,6 +13,8 @@ import {
   Settings,
   Zap,
 } from 'lucide-react';
+import { supabase } from '../supabaseClient';
+import { clearSessionData, getStoredUser, getUserEmail, getUserId, getUserName } from '../utils/session';
 
 const sections = [
   {
@@ -42,6 +45,20 @@ const sections = [
 
 function Sidebar({ activePage }) {
   const navigate = useNavigate();
+  const [user, setUser] = useState(() => getStoredUser());
+
+  useEffect(() => {
+    async function loadUser() {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) setUser((current) => ({ ...data.user, profile: current?.profile }));
+    }
+    loadUser();
+  }, []);
+
+  const displayName = getUserName(user) || 'User';
+  const displayEmail = getUserEmail(user) || 'No email found';
+  const userId = getUserId(user);
+  const displayId = userId ? userId.slice(0, 8) : '-';
 
   return (
     <aside className="w-64 bg-white/80 backdrop-blur-lg border-r border-emerald-100 shadow-lg min-h-screen flex flex-col">
@@ -51,7 +68,7 @@ function Sidebar({ activePage }) {
             <Zap className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-emerald-900">SmartShakthi</h1>
+            <h1 className="text-lg font-bold text-emerald-900">WattLab</h1>
             <p className="text-xs text-emerald-600">Energy Monitor</p>
           </div>
         </div>
@@ -87,14 +104,15 @@ function Sidebar({ activePage }) {
 
       <div className="p-4 border-t border-emerald-100">
         <div className="bg-emerald-50 rounded-lg p-3 mb-3">
-          <p className="text-emerald-900 text-sm font-semibold">User Account</p>
-          <p className="text-emerald-600 text-xs">user@smartshakthi.com</p>
+          <p className="text-emerald-900 text-sm font-semibold">{displayName}</p>
+          <p className="text-emerald-600 text-xs">{displayEmail}</p>
+          <p className="text-emerald-500 text-[10px] font-mono mt-0.5">ID: {displayId}</p>
         </div>
         <button
           type="button"
           onClick={() => {
-            localStorage.removeItem('userRole');
-            localStorage.removeItem('token');
+            clearSessionData();
+            supabase.auth.signOut();
             navigate('/');
           }}
           className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-500 to-orange-600 text-white hover:from-red-600 hover:to-orange-700 transition-all shadow-lg rounded-lg"
@@ -115,7 +133,7 @@ export default function SharedLayout({ children, activePage }) {
         <header className="bg-white/80 backdrop-blur-lg border-b border-emerald-100 shadow-sm">
           <div className="px-6 py-4 flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-emerald-900">SmartShakthi</h1>
+              <h1 className="text-2xl font-bold text-emerald-900">WattLab</h1>
               <p className="text-sm text-emerald-600 mt-1">Smart energy monitoring workspace</p>
             </div>
             <Bell className="w-6 h-6 text-emerald-600" />

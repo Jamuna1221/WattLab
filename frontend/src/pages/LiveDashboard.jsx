@@ -304,6 +304,24 @@ export default function LiveDashboard() {
   const [trayState, setTrayState] = useState(null);
   const [trayError, setTrayError] = useState(null);
 
+  // On mount: auto-load the user's assigned device from the backend
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    fetch('http://localhost:5000/api/devices', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.devices) && data.devices.length > 0) {
+          const firstDeviceId = data.devices[0].device_id;
+          setDeviceId(firstDeviceId);
+          localStorage.setItem('wattlab_device_id', firstDeviceId);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('wattlab_device_id', deviceId);
   }, [deviceId]);
@@ -447,22 +465,19 @@ export default function LiveDashboard() {
               Dashboard
             </Link>
             <div>
-              <h1 className="text-xl font-bold text-emerald-900">Live readings</h1>
+              <h1 className="text-xl font-bold text-emerald-900">Day-Wise Live Readings</h1>
               <p className="text-sm text-emerald-600">
-                Voltage, current, and power — updates every 2s
+                Real-time 2s telemetry feed &amp; NILM Candidate Tray
               </p>
             </div>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-            <label className="text-xs text-emerald-600 font-medium sm:sr-only">
-              Device ID
-            </label>
             <input
               type="text"
               value={deviceId}
-              onChange={(e) => setDeviceId(e.target.value.trim())}
-              className="border border-emerald-200 rounded-lg px-3 py-2 text-sm text-emerald-900 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 min-w-[200px]"
+              onChange={(e) => setDeviceId(e.target.value)}
               placeholder="e.g. SIM-DEVICE-001"
+              className="px-3 py-2 border border-emerald-200 rounded-lg text-sm text-emerald-900"
             />
             <button
               type="button"
@@ -526,63 +541,12 @@ export default function LiveDashboard() {
           <div className="flex items-center gap-2 mb-3">
             <Plug className="w-5 h-5 text-emerald-600" />
             <h2 className="text-lg font-semibold text-emerald-900">
-              Which appliance is running?
+              Predicted Appliances Over Time
             </h2>
           </div>
           <p className="text-sm text-emerald-600 mb-4">
-            Live bulb activity classifier from the latest {activityPrediction?.window_size || 31}
-            &nbsp;power samples. It can show idle, bulb only, other only, or bulb plus other.
+            Live multi-appliance candidate tray and consumption tracking.
           </p>
-          <div className={`rounded-xl border px-4 py-4 ${activityStatus.className}`}>
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-              <span className="text-xs font-bold tracking-wide">
-                {activityStatus.badge}
-              </span>
-              {activityConfidence && (
-                <span className="text-xs font-medium opacity-75">
-                  {activityConfidence}
-                </span>
-              )}
-            </div>
-            <p className="text-2xl font-bold">{activityStatus.title}</p>
-            <p className="text-sm mt-1 opacity-80">{activityStatus.description}</p>
-            {activityPrediction?.avg_power_watts != null && (
-              <p className="text-xs mt-3 opacity-75">
-                Avg {Number(activityPrediction.avg_power_watts).toFixed(2)} W, max{' '}
-                {Number(activityPrediction.max_power_watts || 0).toFixed(2)} W
-              </p>
-            )}
-          </div>
-
-          {activityError && !activityPrediction && (
-            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mt-3">
-              {activityError}
-            </p>
-          )}
-
-          {displayActivityChips.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
-              {displayActivityChips.map(([label, value]) => (
-                <div
-                  key={label}
-                  className={`rounded-lg border px-3 py-2 ${
-                    hasActivityCorrection
-                      ? 'border-amber-200 bg-amber-50'
-                      : 'border-emerald-100 bg-white'
-                  }`}
-                >
-                  <p className="text-xs text-emerald-500">
-                    {label}
-                  </p>
-                  <p className="text-sm font-semibold text-emerald-900">
-                    {typeof value === 'string'
-                      ? value
-                      : `${Math.round(Number(value) * 100)}%`}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
 
           <CandidateTray trayState={trayState} trayError={trayError} />
           <ApplianceConsumption trayState={trayState} />

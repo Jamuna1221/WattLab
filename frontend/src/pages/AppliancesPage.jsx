@@ -29,27 +29,22 @@ const APPLIANCES = [
   { key: 'dishwasher', name: 'Dishwasher', icon: Utensils },
 ];
 
-const MOCK_HEALTH = { activity_models_loaded: ['bulb', 'fridge'] };
-const MOCK_TRAY = { total_confirmed_kwh: { fridge: 0.042, bulb: 0.006 } };
-
 export default function AppliancesPage() {
-  const [health, setHealth] = useState(MOCK_HEALTH);
-  const [trayState, setTrayState] = useState(MOCK_TRAY);
-  const [usingFallback, setUsingFallback] = useState(false);
+  const [health, setHealth] = useState(null);
+  const [trayState, setTrayState] = useState(null);
+  const [errorMsg, setErrorMsg] = useState(null);
 
   const load = useCallback(async () => {
+    setErrorMsg(null);
     try {
       const [healthRes, trayRes] = await Promise.all([
-        api.get('/health').catch(() => ({ data: MOCK_HEALTH })),
-        api.get('/tray/state').catch(() => ({ data: MOCK_TRAY })),
+        api.get('/predictions/health').catch(() => api.get('/health')),
+        api.get('/tray/state'),
       ]);
-      setHealth(healthRes.data || MOCK_HEALTH);
-      setTrayState(trayRes.data || MOCK_TRAY);
-      setUsingFallback(healthRes.data === MOCK_HEALTH || trayRes.data === MOCK_TRAY);
-    } catch {
-      setHealth(MOCK_HEALTH);
-      setTrayState(MOCK_TRAY);
-      setUsingFallback(true);
+      setHealth(healthRes.data || null);
+      setTrayState(trayRes.data || null);
+    } catch (err) {
+      setErrorMsg(err.message || 'Error loading appliance data');
     }
   }, []);
 
@@ -57,7 +52,7 @@ export default function AppliancesPage() {
     load();
   }, [load]);
 
-  const loaded = new Set(health?.activity_models_loaded || MOCK_HEALTH.activity_models_loaded);
+  const loaded = new Set(health?.activity_models_loaded || []);
   const totals = trayState?.total_confirmed_kwh || {};
 
   return (
@@ -70,9 +65,9 @@ export default function AppliancesPage() {
               Track each appliance&apos;s energy usage and status
             </p>
           </div>
-          {usingFallback && (
+          {errorMsg && (
             <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
-              Showing fallback data
+              {errorMsg}
             </span>
           )}
         </div>

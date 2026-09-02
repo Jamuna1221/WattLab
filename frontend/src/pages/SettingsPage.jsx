@@ -3,6 +3,7 @@ import { Bell, Cpu, Save, User, Wallet } from 'lucide-react';
 import SharedLayout from '../components/SharedLayout';
 import api from '../utils/api';
 import { supabase } from '../supabaseClient';
+import { getStoredUser, getUserEmail, getUserName, getUserProfile } from '../utils/session';
 
 const defaultPrefs = {
   highConsumption: true,
@@ -26,12 +27,17 @@ function Toggle({ checked, onChange, label }) {
 }
 
 export default function SettingsPage() {
-  const [name, setName] = useState(localStorage.getItem('wattlab_user_name') || 'Demo User');
-  const [email, setEmail] = useState('user@smartshakthi.com');
-  const [deviceId, setDeviceId] = useState(localStorage.getItem('wattlab_device_id') || 'SIM-DEVICE-001');
+  const storedUser = getStoredUser();
+  const [name, setName] = useState(() => localStorage.getItem('wattlab_user_name') || getUserName(storedUser));
+  const [email, setEmail] = useState(() => getUserEmail(storedUser));
+  const [deviceId, setDeviceId] = useState(
+    () => localStorage.getItem('wattlab_device_id') || import.meta.env.VITE_DEFAULT_DEVICE_ID || ''
+  );
   const [deviceOnline, setDeviceOnline] = useState(false);
+  const [deviceStatus, setDeviceStatus] = useState('Not linked');
   const [tariff, setTariff] = useState(localStorage.getItem('wattlab_tariff') || '8.50');
   const [stateName, setStateName] = useState(localStorage.getItem('wattlab_state') || 'Tamil Nadu');
+  const [budgetGoal, setBudgetGoal] = useState(localStorage.getItem('wattlab_budget_goal') || '1500');
   const [prefs, setPrefs] = useState(() => {
     try {
       return { ...defaultPrefs, ...JSON.parse(localStorage.getItem('wattlab_notification_prefs') || '{}') };
@@ -41,18 +47,57 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user?.email) setEmail(data.user.email);
+    async function loadAccountAndDevice() {
+      const stored = getStoredUser();
+      const storedProfile = getUserProfile(stored);
+      if (stored) {
+        setEmail(getUserEmail(stored));
+        setName((current) => current || getUserName(stored));
+      }
 
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        if (!storedProfile?.email) {
+          setEmail(data.user.email);
+        }
+        if (data.user.user_metadata?.name) {
+          setName(data.user.user_metadata.name);
+          localStorage.setItem('wattlab_user_name', data.user.user_metadata.name);
+        }
+      }
+
+      let resolvedDeviceId = deviceId;
       try {
+        const { data: devicesData } = await api.get('/devices');
+        const devices = Array.isArray(devicesData?.devices) ? devicesData.devices : [];
+        if (devices.length > 0) {
+          const activeDevice =
+            devices.find((device) => ['ONLINE', 'ASSIGNED'].includes(device.status)) || devices[0];
+          resolvedDeviceId = activeDevice.device_id || '';
+          setDeviceId(resolvedDeviceId);
+          setDeviceStatus(activeDevice.status || 'Linked');
+          if (resolvedDeviceId) localStorage.setItem('wattlab_device_id', resolvedDeviceId);
+        } else {
+          setDeviceStatus('No device linked');
+        }
+      } catch {
+        setDeviceStatus(resolvedDeviceId ? 'Saved locally' : 'No device linked');
+      }
+    }
+    loadAccountAndDevice();
+  }, []);
+
+  useEffect(() => {
+    async function checkDeviceStatus() {
+      try {
+        if (!deviceId) throw new Error('No device selected');
         await api.get(`/readings/live/${encodeURIComponent(deviceId)}`);
         setDeviceOnline(true);
       } catch {
         setDeviceOnline(false);
       }
     }
-    load();
+    checkDeviceStatus();
   }, [deviceId]);
 
   function saveProfile() {
@@ -66,6 +111,10 @@ export default function SettingsPage() {
   function saveTariff() {
     localStorage.setItem('wattlab_tariff', tariff);
     localStorage.setItem('wattlab_state', stateName);
+  }
+
+  function saveBudget() {
+    localStorage.setItem('wattlab_budget_goal', budgetGoal);
   }
 
   function savePrefs() {
@@ -122,6 +171,7 @@ export default function SettingsPage() {
                   value={deviceId}
                   onChange={(event) => setDeviceId(event.target.value)}
                   className="mt-1 w-full rounded-lg border border-emerald-200 px-3 py-2 text-emerald-900"
+                  placeholder="No linked device"
                 />
               </label>
               <span
@@ -131,7 +181,7 @@ export default function SettingsPage() {
                     : 'bg-red-50 text-red-700 border border-red-100'
                 }`}
               >
-                {deviceOnline ? 'Connected' : 'Offline'}
+                {deviceOnline ? 'Connected' : deviceStatus}
               </span>
               <div>
                 <button onClick={saveDevice} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white">
@@ -176,6 +226,30 @@ export default function SettingsPage() {
               <Save className="w-4 h-4" />
               Save tariff
             </button>
+          </section>
+
+          <section className="bg-white/90 border border-emerald-100 rounded-xl p-6 shadow-sm">
+            <div className="flex items-center gap-2 mb-5">
+              <Wallet className="w-5 h-5 text-emerald-600" />
+              <h3 className="text-lg font-semibold text-emerald-900">Budget Goal</h3>
+            </div>
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-emerald-700">
+                Monthly bill target (Rs)
+                <input
+                  type="number"
+                  step="50"
+                  value={budgetGoal}
+                  onChange={(event) => setBudgetGoal(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-emerald-200 px-3 py-2 text-emerald-900"
+                />
+              </label>
+              <p className="text-xs text-emerald-600">Set a monthly spending target. The Bill Forecast and Dashboard will show your progress against this goal.</p>
+              <button onClick={saveBudget} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white">
+                <Save className="w-4 h-4" />
+                Save budget goal
+              </button>
+            </div>
           </section>
 
           <section className="bg-white/90 border border-emerald-100 rounded-xl p-6 shadow-sm">

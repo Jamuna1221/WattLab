@@ -384,3 +384,12 @@ exports.runAutoBulbPredictionCycle = async () => {
   return results;
 };
 
+exports.getFlaskHealth = async () => {
+  try {
+    const response = await fetch(`${FLASK_URL}/health`);
+    if (!response.ok) return { status: 'offline', activity_models_loaded: [], state_models_loaded: [] };
+    return await response.json();
+  } catch (err) {
+    return { status: 'offline', activity_models_loaded: [], state_models_loaded: [], error: err.message };
+  }
+};
